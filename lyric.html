@@ -1,59 +1,38 @@
 <!--
 
-OKAY.
+Things I know how to implement:
 
-This is going to be like Steno Hero, but BETTER.
+    * Generate a heat map of words you got wrong from the
+      transcript.
 
-The primary innovations are:
+    * Generate a heat map of how long it took to do the words
 
-1. Different difficulty levels.  You have to be PRETTY good at
-steno to do song data, which means newbies are missing out on
-the fun.  One way to solve this problem is to SIMPLIFY what you
-actually have to stroke out.  We'll have these modes:
+    * If we can guess what the "right" stroke which was supposed
+      to be used (reasonable for simplified test sets), we can
+      collect per key and chord statistics (which keys do you get
+      wrong)
 
-    Vowels only: stroke out the vowels of words.  We can either
-    be single vowel (in which case ANY vowel in the word is
-    accepted) or multi-vowel (you have to give the vowels for
-    ALL of the strokes of a given spelling).
+    * Aggregated data: if you do the same test set multiple times,
+      give some ability to track progress over time.
 
-    Starting consonants: stroke out the initial consonant of a word.
+    * Karaoke mode: take a cue file and do time trials. (Need to
+      give user a grace period since the subfiles will not necessarily
+      be the right place.) Use YOUTUBE to source music cheaply.
 
-    Terminal consonants: stroke out the terminal consonant
+    * Time trial mode: karaoke mode but without the karaoke
 
-    Left hand/right hand mode: basically, you only need to stroke
-    one hand's worth (well, do the vowel keys for the other hand.)
+This is like, a non-gameified version of many of the minigames
+imagined in http://plover.stenoknight.com/2011/04/hover-plover.html
 
-    Full mode
+Bugs:
 
-Additionally, you can toggle whether or not solitary briefs should
-be included in this stream; also, you can do JUST briefs.
-
-Give bonus points for streaks
-
-Stats gathering, render it with D3
-
-Lots of code shamelessly ripped off from QWERTY Steno.
-
-UI Notes:
-
-1. What should happen when we move onto the next cue?  Some data
-files may switch to the next lyric early in order to accommodate the
-karaoke use-case, but we want to give a stenographer some grace period
-before moving on.  Idea: when the cue file indicates the next cue is
-due, but the stenographer hasn't gotten there yet, give them a little
-grace period proportional to the length of the next phrase.  If their
-percent completion of the previous lyric isn't good enough, however,
-kick them out immediately.
-
-TODO:
-
-1. Partial strokes UI is pretty confusing.  Can we chunk up the
-words somehow?  Seems algorithmically tricky.
-
-2. Hook up to LRC and YouTube (YouTube has a nice JS API).
+    * Partial strokes UI is pretty confusing.  Can we chunk up the
+      words somehow to give partial progress?  Seems algorithmically tricky.
 
 -->
 <html>
+<head>
+<title>Stenomatic 9000</title>
 <link rel="prefetch" href="dict.json">
 <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
 <style>
@@ -68,6 +47,7 @@ words somehow?  Seems algorithmically tricky.
 h2 {font-size:1.2em;}
 td {vertical-align: top;}
 </style>
+</head>
 <body>
 <div id="viewport"><em>Loading Dictionary...</em></div>
 <div>
@@ -80,7 +60,7 @@ td {vertical-align: top;}
 <input type="checkbox" id="chkPlainTextInput">
 <hr>
 <p>
-How to use me: copy paste some exercise material (for example, the exercises in <a href="https://sites.google.com/site/ploverdoc/lesson-1-fingers-and-keys">Learn Plover</a>) and select what kind of exercise you want to do.
+<em>Greetings mortal, I am the Stenomatic 9000</em>. To utilize my services, copy paste some exercise material (for example, the exercises in <a href="https://sites.google.com/site/ploverdoc/lesson-1-fingers-and-keys">Learn Plover</a>) and select what kind of exercise you want to do.  Then press load and go! (If you change any settings, you will need to reload the exercise.)  I am a derivative work of <a href="http://qwertysteno.com/Home/">Qwerty Steno</a>, with whom I share the QWERTY input handling code.
 </p>
 <h2>Mode:</h2>
 <table id="modebtns">
@@ -105,31 +85,31 @@ How to use me: copy paste some exercise material (for example, the exercises in 
     </tr>
 </table>
 <h2>Difficulty:</h2>
+You can reduce the difficulty of exercises by practicing only subsets of the Steno keyboard. <input type="submit" value="Enable all" onclick="$('#difficultybtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#difficultybtns input').prop('checked', false);" />
 <table id="difficultybtns">
     <tr>
-        <td><input type="radio" name="difficulty" value="vowel" checked></td>
-        <td><strong class="boxLabel">Vowels only</strong> You only need to stroke
-            the AOEU keys of any word to be stroked.  Solitary briefs
-            (which aren't spelled phonetically) are omitted.
+        <td><input type="checkbox" id="enable-left" value="left" checked></td>
+        <td><strong class="boxLabel">Left hand keys</strong> (STKPWHR)
         </td>
     </tr>
     <tr>
-        <td><input type="radio" name="difficulty" value="leftvowel"></td>
-        <td><strong class="boxLabel">Left hand</strong> You only need to stroke
-            the left hand keys and all vowels.
+        <td><input type="checkbox" id="enable-vowels" value="vowel" checked></td>
+        <td><strong class="boxLabel">Vowel keys</strong> (AOEU)
         </td>
     </tr>
     <tr>
-        <td><input type="radio" name="difficulty" value="rightvowel"></td>
-        <td><strong class="boxLabel">Right hand</strong> You only need to stroke
-            the right hand keys and all vowels.  This difficulty mode may not make much
-            sense on exercises with multi-stroke words.
+        <td><input type="checkbox" id="enable-asterisk" value="asterisk" checked></td>
+        <td><strong class="boxLabel">Asterisk</strong> If this is unchecked, words which must be disambiguated with an asterisk will not be given.
         </td>
     </tr>
     <tr>
-        <td><input type="radio" name="difficulty" value="standard"></td>
-        <td><strong class="boxLabel">Case-insensitive, no punctuation</strong>
-            Stroke your way to victory.
+        <td><input type="checkbox" id="enable-right" value="right" checked></td>
+        <td><strong class="boxLabel">Right hand</strong> (FRPBLGTSDZ)
+        </td>
+    </tr>
+    <tr>
+        <td><input type="checkbox" id="enable-multistroke" value="multistroke" checked></td>
+        <td><strong class="boxLabel">Multi-stroke</strong> If this is unchecked, only the first stroke of multi-stroke words will be tested.
         </td>
     </tr>
 </table>
@@ -166,41 +146,6 @@ function wordStrokes(word) {
     var r = rdata[cleanWord(word)];
     return r ? r : [];
 }
-function vowelifyStroke(stroke) {
-    var r = [];
-    var parts = stroke.split('/');
-    for (var i = 0; i < parts.length; i++) {
-        var m = parts[i].match(/[AOEU]+/);
-        if (m && parts[i].indexOf("*") == -1) {
-            r.push(m[0]);
-        } else {
-            return false;
-        }
-    }
-    return r.join('/');
-}
-function leftifyStroke(stroke) {
-    var steno = stroke.split('/')[0];
-    var left = getLeftLettersFromSteno(steno);
-    return left;
-}
-function rightifyStroke(stroke) {
-    var steno = stroke.split('/')[0];
-    var right = getRightLettersFromSteno(steno);
-    return right;
-}
-function leftifyVowelStroke(stroke) {
-    var steno = stroke.split('/')[0];
-    var left = getLeftLettersFromSteno(steno);
-    var middle = getMiddleLettersFromSteno(steno);
-    return left + middle;
-}
-function rightifyVowelStroke(stroke) {
-    var steno = stroke.split('/')[0];
-    var middle = getMiddleLettersFromSteno(steno);
-    var right = getRightLettersFromSteno(steno);
-    return middle + right;
-}
 function bestStroke(strokes) {
     var cand;
     $.each(strokes, function(i, s) {
@@ -208,9 +153,23 @@ function bestStroke(strokes) {
             });
     return cand;
 }
-function solitaryBrief(word) {
-    if (cleanWord(word) == "it's") return true;
-    return wordStrokes(word).every(function(s) {return vowelifyStroke(s) == s && !s.match(/^[AOEU\/]+$/)});
+function filterDifficulty(stroke) {
+    var strokes = stroke.split("/");
+    var r = [];
+    for (var i = 0; i < strokes.length; i++) {
+        if (!$("#enable-asterisk").prop("checked") && strokes[i].indexOf("*") != -1) return false;
+        var leftLetters = "", rightLetters = "", middleLetters = "";
+        if ($("#enable-left").prop("checked")) { leftLetters = getLeftLettersFromSteno(strokes[i]); }
+        if ($("#enable-vowels").prop("checked")) { middleLetters = getMiddleLettersFromSteno(strokes[i]); }
+        if ($("#enable-right").prop("checked")) { rightLetters = getRightLettersFromSteno(strokes[i]); }
+        if (middleLetters.length == 0 && rightLetters.length > 0) { middleLetters = "-"; }
+        r.push(leftLetters + middleLetters + rightLetters);
+        if (!$("#enable-multistroke").prop("checked")) {
+            break;
+        }
+    }
+    return r.join("/");
+    //var steno = stroke.split('/')[0];
 }
 // TODO: lift "chordifying" code from https://plover.goeswhere.com/
 // so we can get per-chord stats
@@ -220,8 +179,7 @@ function solitaryBrief(word) {
 var data, cur_line, cur_word;
 var cur_elems;
 var currentStroke = 1;
-var cur_mode, cur_difficulty, cur_style;
-var cur_difficulty_transform;
+var cur_mode, cur_style;
 var samples; // {time: Date, start_time: Date, expected_strokes: [String], actual_stroke: String, line: Number, word: Number}
 var stroke_start, exercise_start;
 var streak = 0;
@@ -232,20 +190,7 @@ function updateMode() {
 }
 
 function updateDifficulty() {
-    cur_difficulty = $('input[name=difficulty]:checked', '#difficultybtns').val();
-    if (cur_difficulty == "vowel") {
-        cur_difficulty_transform = vowelifyStroke;
-    } else if (cur_difficulty == "left") {
-        cur_difficulty_transform = leftifyStroke;
-    } else if (cur_difficulty == "right") {
-        cur_difficulty_transform = rightifyStroke;
-    } else if (cur_difficulty == "leftvowel") {
-        cur_difficulty_transform = leftifyVowelStroke;
-    } else if (cur_difficulty == "rightvowel") {
-        cur_difficulty_transform = rightifyVowelStroke;
-    } else {
-        cur_difficulty_transform = function(s) {return s;}
-    }
+    // cur_difficulty = [$("#enable-vowels").val(), $("#enable-left").val(), $("#enable-right").val(), $("#enable-asterisk").val()];
 }
 
 function updateStyle() {
@@ -261,7 +206,7 @@ function updateBarometer() {
     // ToDo: WPM is not really right, but doing it this way
     // so that the easier difficulty modes are not completely
     // bogus
-    $('#barometer').html(cur_line + "/" + data.length + " <strong>WPM:</strong> " + wpm + ", <strong>Streak:</strong> " + streak + " (best: " + best_streak + ")");
+    $('#barometer').html((cur_line + 1) + "/" + data.length + " <strong>WPM:</strong> " + wpm + ", <strong>Streak:</strong> " + streak + " (best: " + best_streak + ")");
 }
 
 // hmm, I don't know what to actually do with this data
@@ -321,7 +266,7 @@ function loadData() {
                 $.each( words, function(i,word) {
                     if (/\S/.test(word)) {
                         cur.push(word);
-                        if (mapFilter(wordStrokes(word), cur_difficulty_transform)) {
+                        if (mapFilter(wordStrokes(word), filterDifficulty)) {
                             sub_c++;
                         }
                     }
@@ -336,7 +281,7 @@ function loadData() {
                 var words = line.split(" ");
                 $.each( words, function(i, rword) {
                     var word = depunctuateWord(rword);
-                    if (/\S/.test(word) && mapFilter(wordStrokes(word), cur_difficulty_transform)) {
+                    if (/\S/.test(word) && mapFilter(wordStrokes(word), filterDifficulty)) {
                         corpus.push(word);
                     }
                     });
@@ -360,6 +305,7 @@ function startData() {
     streak = 0;
     best_streak = 0;
     $("#txtInput").removeClass("complete");
+    $('#barometer').html("");
     paintLine();
 }
 function paintLine() {
@@ -369,8 +315,11 @@ function paintLine() {
     $.each(data[cur_line].words, function (i, word) {
             var elem = $("<span>");
             var strokes = wordStrokes(word);
+            var t_strokes = mapFilter(strokes, filterDifficulty);
             if (!strokes.length) {
                 elem.addClass("nostroke");
+            } else if (!t_strokes.length) {
+                elem.addClass("done");
             }
             elem.text(word);
             cur_elems.push(elem);
@@ -402,7 +351,7 @@ function nextWord() {
     }
     var word = data[cur_line].words[cur_word];
     var strokes = wordStrokes(word);
-    var t_strokes = mapFilter(strokes, cur_difficulty_transform);
+    var t_strokes = mapFilter(strokes, filterDifficulty);
     if (!t_strokes.length) {
         return nextWord();
     }
@@ -437,6 +386,7 @@ function uniq(a) {
 
 // Given to steno strokes, picks the 'better' one. We base this
 // mostly on stroke size.
+// TODO: have an expert look at this!
 function take_best(s1, s2) {
     if (!s1) return s2;
     if (/\d/.test(s1)) { return s2; }
