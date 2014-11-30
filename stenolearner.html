@@ -1,0 +1,1489 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Steno Learner</title>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+<script>
+// A little bit of magic to make it as easy as possible to use your own Plover dictionary.
+var Steno = (function() { var dictionary = {};
+  return { get dictionary() { return dictionary; }, 
+           set dictionary(appending) { jQuery.extend(dictionary, appending); } };
+})();
+</script>
+<!-- Your dictionary files should be listed below. Each file is in the same format as used
+by Plover, but with the extension changed from ".json" to ".js" and with "Steno.dictionary ="
+inserted at the very beginning, before the first {. -->
+<script>
+// Order of keys, when converting to RTF/CRE
+var stenoOrder = [ 
+  "#",
+  "S-", "T-", "K-", "P-", "W-", "H-", "R-", 
+  "A", "O", "*", "E", "U", 
+  "-F", "-R", "-P", "-B", "-L", "-G", "-T", "-S", "-D", "-Z",
+];
+
+// Map from event.which keycode to steno equivalent
+var keyboards = {
+  qwerty: {
+    "65": "S-",
+    "81": "S-",
+    "87": "T-",
+    "83": "K-",
+    "69": "P-",
+    "68": "W-",
+    "82": "H-",
+    "70": "R-",
+    "67": "A",
+    "86": "O",
+    "84": "*",
+    "71": "*",
+    "89": "*",
+    "72": "*",
+    "78": "E",
+    "77": "U",
+    "85": "-F",
+    "74": "-R",
+    "73": "-P",
+    "75": "-B",
+    "79": "-L",
+    "76": "-G",
+    "80": "-T",
+    "59": "-S",
+    "186": "-S",
+    "219": "-D",
+    "222": "-Z",
+    "49": "#",
+    "50": "#",
+    "51": "#",
+    "52": "#",
+    "53": "#",
+    "54": "#",
+    "55": "#",
+    "56": "#",
+    "57": "#",
+    "48": "#",
+    "109": "#"
+  },
+  dvorak: {
+    "222": "S-",
+    "65": "S-",
+    "188": "T-",
+    "79": "K-",
+    "190": "P-",
+    "69": "W-",
+    "80": "H-",
+    "85": "R-",
+    "74": "A",
+    "75": "O",
+    "89": "*",
+    "73": "*",
+    "70": "*",
+    "68": "*",
+    "66": "E",
+    "77": "U",
+    "71": "-F",
+    "72": "-R",
+    "67": "-P",
+    "84": "-B",
+    "82": "-L",
+    "78": "-G",
+    "76": "-T",
+    "83": "-S",
+    "191": "-D",
+    "189": "-Z",
+    "49": "#",
+    "50": "#",
+    "51": "#",
+    "52": "#",
+    "53": "#",
+    "54": "#",
+    "55": "#",
+    "56": "#",
+    "57": "#",
+    "48": "#",
+  },
+  colemak: {
+    "81": "S-",
+    "65": "S-",
+    "87": "T-",
+    "82": "K-",
+    "70": "P-",
+    "83": "W-",
+    "80": "H-",
+    "84": "R-",
+    "67": "A",
+    "86": "O",
+    "71": "*",
+    "68": "*",
+    "74": "*",
+    "72": "*",
+    "75": "E",
+    "77": "U",
+    "76": "-F",
+    "78": "-R",
+    "85": "-P",
+    "69": "-B",
+    "89": "-L",
+    "73": "-G",
+    "186": "-T",
+    "79": "-S",
+    "219": "-D",
+    "222": "-Z",
+    "49": "#",
+    "50": "#",
+    "51": "#",
+    "52": "#",
+    "53": "#",
+    "54": "#",
+    "55": "#",
+    "56": "#",
+    "57": "#",
+    "48": "#",
+  },
+};
+
+var keyCodeToSteno = keyboards.qwerty;
+
+Array.prototype.last = function() { return this[this.length - 1]; };
+Array.prototype.binarySearch = function(target, fn) {
+  fn = fn || function(a, b) { return a < b ? -1 : a > b ? 1 : 0; };
+  var min = 0;
+  var max = this.length - 1;
+  while(min <= max) {
+    var mid = (min + max) >>> 1;
+    var compare = fn(target, this[mid]);
+    if(compare < 0) {
+      max = mid - 1;
+    } else if(compare > 0) {
+      min = mid + 1;
+    } else {
+      return mid;
+    }
+  }
+  return -1 - min;
+};
+Array.prototype.mapInPlace = function(fn) {
+  for(var i = 0; i < this.length; i++) {
+    this[i] = fn(this[i]);
+  }
+};
+
+function compareStrokes(a, b) {
+  // Compare first by stroke count, then length
+  return count(a) - count(b) || a.length - b.length || (a < b ? -1 : a > b ? 1 : 0); 
+}
+
+var foldableSuffixes = [
+  /([AO\*EU\-][FRPBL]*)([TSDZ]*)\/-(G)$/,
+  /([AO\*EU\-][FRPBLGT]*)([DZ]*)\/-(S)$/,
+  /([AO\*EU\-][FRPBLGTS]*)([Z]*)\/-(D)$/,
+  /([AO\*EU\-][FRPBLGTSD]*)()\/-(Z)$/,
+];
+
+// Add to this list any folded suffix forms that are not in it.
+// Assume a sorted list.
+function foldSuffixes(list) {
+  if(!list) return list;
+  
+  for(var i = 0; i < list.length; i++) {
+    foldableSuffixes.forEach(function(s) {
+      var rep = list[i].replace(s, "$1$3$2");
+      if(rep != list[i]) {
+        var index = -1 - list.binarySearch(rep);
+        if(index >= 0) {
+          list.splice(index, 0, rep);
+          if(index <= i) i++;
+        }
+      }
+    });
+  }
+  return list;
+}
+
+// Represents one possible reverse lookup (possible strokes and current node).
+function ReverseLookup(node, newStrokes, basis, max) {
+  if(!basis || !basis.strokes) {
+    this.strokes = newStrokes && newStrokes.filter(function(a) { return count(a) <= max; });
+  } else {
+    this.strokes = [];
+    for(var i = 0; i < basis.strokes.length; i++) {
+      var newMax = max - count(basis.strokes[i]);
+      for(var j = 0; j < newStrokes.length; j++) {
+        if(count(newStrokes[j]) <= newMax) {
+          this.strokes.push(basis.strokes[i] + '/' + newStrokes[j]);
+        }
+      }
+    }
+  }
+  foldSuffixes(this.strokes);
+  this.node = node;
+}
+ReverseLookup.prototype = {
+  // Merge the strokes in these two options, assuming both stroke lists are sorted.
+  merge: function(other) {
+    for(var i = 0, j = 0; i < this.strokes.length && j < other.strokes.length; ) {
+      if(this.strokes[i] > other.strokes[j]) {
+        this.strokes.splice(i++, 0, other.strokes[j++]);
+      } else {
+        if(this.strokes[i] == other.strokes[j]) j++;
+        i++;
+      }
+    }
+    while(j < other.strokes.length) this.strokes.push(other.strokes[j++]);
+  },
+};
+// Load the dictionary through AJAX if necessary
+$(document).ready(function() {
+  if(!$.isEmptyObject(Steno.dictionary)) {
+    buildReverseLookup(Steno.dictionary);
+    return;
+  }
+  // Only load the dictionary with AJAX if it was not loaded through a script
+  // include. Script include would be used locally for offline use, since Chrome
+  // won't get file:// URLs with AJAX.
+  $.getJSON('assets/dict.json', function (dictionary) {
+    Steno.dictionary = dictionary;
+    buildReverseLookup(Steno.dictionary);
+  });
+});
+
+// Called after the dictionary is loaded, to build reverse lookup.
+function buildReverseLookup(dictionary) {
+  // Append this continuation to the paths
+  function append(root, path, continuation, stroke) {
+    for(var i = 0; i < path.length; i++) {
+      root = root[path[i]] = root[path[i]] || {};
+    }
+    var list = root['$'] = root['$'] || [];
+    for(var i = 0; i < list.length; i++) {
+      if(list[i].continuation === continuation) {
+        var index = list[i].strokes.binarySearch(stroke);
+        if(index < 0) {
+          list[i].strokes.splice(-1 - index, 0, stroke);
+        }
+        return;
+      }
+    }
+    list.push({ continuation:continuation, strokes:[ stroke ] });
+  }
+  function appendSuffixes(root, text, stroke) {
+    function app(ending, remove, add) {
+      append(root, (remove ? text.substring(0, text.length - remove) : text) + (add || ''), ending, stroke);
+    }
+    
+    if(/(?:[bcdfghjklmnprstvwxyz]|qu)(?:[aeiou][bcdfgklmnptvz]|[aeiu]r)$/.test(text)) {
+      // Consonant doubling
+      var dup = text.charAt(text.length - 1);
+      app(ing, 0, dup);
+      app(ist, 0, dup);
+      app(en, 0, dup);
+      app(iy, 0, dup);
+    } else if(/[bcdfghjklmnpqrstuvwxz]e$/.test(text)) {
+      // Silent e
+      app(ing, 1);
+      app(ist, 1);
+      /te$/.test(text) ? app(en, 1, 't') : app(en, 1);
+      app(iy, 1);
+    } else {
+      /ie$/.test(text) ? app(ing, 2, 'y') : app(ing);
+      /[cdfghlmnpr]y$/.test(text) ? app(ist, 1) : app(ist);
+      app(en);
+      /[bcdfghjklmnpqrstvwxz]y$/.test(text) ? app(iy, 1) : app(iy);
+    }
+    
+    /[aeiou]c$/.test(text) ? app(ly, 0, 'al') : app(ly);
+    
+    /[bcdfghjklmnpqrstvwxz]y$/.test(text) ? app(aeou, 1, 'i') : app(aeou);
+    
+    /[bcdfghjklmnpqrstvwxz]y$/.test(text) ? app(s, 1, 'ie') :
+      /(oa|ea|i|ee|oo|au|ou|l|n|(([^a]|^)|([^gin]|^)a)r|t)ch$/.test(text) ? app(s, 0, 'e') :
+      /(s|sh|x|z|zh)$/.test(text) ? app(s, 0, 'e') : app(s);
+   
+    /[bcdfghjklmnpqrstvwxz]y$/.test(text) && text != "my" ? app(continuation, 1, 'i') : app(continuation);
+  }
+  // Options for continuation based on root:
+  var ly = {};
+  var s = {};
+  var ing = {};
+  var ist = {};
+  var en = {};
+  var iy = {};
+  var aeou = {};
+  var continuation = {} // Any other suffix not meeting these patterns
+  // Root, for non-suffix or continuation after prefix
+  var root = {};
+  // Strokes that implement word join
+  var join = [];
+  
+  maxStrokesInTranslation = 1;
+  for(stroke in dictionary) {
+    var translation = dictionary[stroke];
+    maxStrokesInTranslation = Math.max(maxStrokesInTranslation, count(stroke));
+
+    if(translation == "{^^}") join.push(stroke);
+    
+    translation = translation.toLowerCase().replace(/[\{\}]/g, '').trim();
+    // Only support reverse lookup on letters, hyphens, and spaces.
+    // Don't include the space stroke, because then we get multiple words spuriously.
+    // Don't include strokes with numbers in them, because they are definitely just there
+    //    to accomodate a misstroke, and are not useful to learn.
+    if(translation == "^ ^" || !/^[a-z\- \^]+$/.test(translation) || /[0-9]/.test(stroke)) continue;
+    
+    var applyTo = root;
+    if(translation.charAt(0) == '^') {
+      // Suffix or infix
+      translation = translation.substring(1);
+      applyTo = translation == 'ly' ? ly :
+        translation == 's' ? s :
+        translation == 'ing' ? ing :
+        translation == 'ist' ? ist :
+        translation == 'en' ? en :
+        /^[iy]/.test(translation) ? iy :
+        /^[aeou]/.test(translation) ? aeou : continuation;
+    }
+    
+    var attach = translation.charAt(translation.length - 1) == '^';
+    if(attach) translation = translation.substring(0, translation.length - 1);
+    
+    // The translation must lead back to root if it ends in ^, and otherwise is a valid end.
+    append(applyTo, translation, attach ? root : undefined, stroke);
+    // Allow suffix attachment to all 
+    appendSuffixes(applyTo, translation, stroke);
+  }
+  ReverseLookup.root = root;
+  ReverseLookup.join = join;
+  
+  startEngine();
+}
+
+var maxOptions = 5;
+
+// Look up strokes that would form this word, using no more than max strokes.
+function reverseLookup(word, max) {
+  var options = [ new ReverseLookup(ReverseLookup.root) ];
+  
+  for(var i = 0; i < word.length; i++) {
+    // Add any new options from the current location
+    for(var j = options.length - 1; j >= 0; j--) {
+      if(options[j].node.$) options[j].node.$.forEach(function(a) {
+        // Here we must have one less than the max strokes, since there is more to come
+        var add = new ReverseLookup(a.continuation, a.strokes, options[j], max - 1);
+        if(!add.node) add = new ReverseLookup(ReverseLookup.root, ReverseLookup.join, add, max - 1);
+        
+        if(add.strokes.length) options.push(add);
+      });
+    }
+    // Advance, filtering out any failed translations
+    var c = word.charAt(i);
+    for(var j = 0; j < options.length; j++) {
+      if(!(options[j].node = options[j].node[c])) {
+        if(j == options.length - 1) {
+          options.pop();
+        } else {
+          options[j--] = options.pop();
+        }
+      }
+    }
+    // Merge duplicate paths
+    for(var j = 0; j < options.length - 1; j++) {
+      for(var k = j + 1; k < options.length; k++) {
+        if(options[j].node === options[k].node) {
+          options[j].merge(options[k]);
+          options.splice(k--, 1);
+        }
+      }
+    }
+  }
+  // Insert the options into the array in order, eliminating duplicates
+  var ret = [];
+  var start = new State();
+  var end = new State();
+  options.forEach(function(a) {
+    if(a.node.$) a.node.$.forEach(function(b) {
+      if(!b.continuation) new ReverseLookup(1, b.strokes, a, max).strokes.forEach(function(c) {
+        var index = ret.binarySearch(c, compareStrokes);
+        if(index < 0 && index >= -maxOptions && deMetafy(rawTranslate(c), start, end) == word) {
+          ret.splice(-1 - index, 0, c);
+          if(ret.length > maxOptions) ret.pop();
+        }
+      });
+    });
+  });
+  return ret;
+}
+
+// Greedily look up translatable strokes.
+function rawTranslate(strokes) {
+  var text = '';
+  for(var start = 0; start < strokes.length; ) {
+    // Try longest translations first
+    for(var end = strokes.length; ; end = strokes.lastIndexOf('/', end - 1)) {
+      if(end == -1) {
+        return undefined;
+      }
+      var add = lookUp(strokes.substring(start, end));
+      if(add) {
+        text += add;
+        start = end + 1;
+        break;
+      }
+    }
+  }
+  return text;
+}
+
+// Count the number of strokes in a word
+function count(stroke) {
+  var count = 0;
+  for(var i = 0; i != -1; i = stroke.indexOf('/', i + 1)) count++;
+  return count;
+}
+
+// Count the number of words in this text. A word is a space followed by at
+// least one letter. HTML tags are not words.
+function wordCount(text) {
+  var count = 0;
+  for(var i = text.indexOf(' '); i != -1; i = j) {
+    var j = text.indexOf(' ', i + 1);
+    var span = text.substring(i + 1, j < 0 ? text.length : j);
+    if(/[a-z]/i.test(span) && !/[<>]/.test(span)) count++;
+  }
+  return count;
+}
+
+// Look up a definition in the dictionary. Suffix folding is also allowed in the 
+// last stroke of the definition. If there is no definition, undefined is returned.
+function lookUp(stroke) {
+  // First look for a complete translation
+  var translation = Steno.dictionary[stroke];
+  if(translation) {
+    return translation;
+  }
+  // Next try holding out any suffix keys in the last stroke
+  for(var i = stroke.length - 1; i > 0; i--) {
+    var c = stroke.charAt(i);
+    if(/[GSDZ]/.test(c)) {
+      // Try removing that suffix key, and the - before it if it was
+      // the only key on the right hand side and there were no vowels.
+      var t = lookUp((stroke.substring(0, i) + stroke.substring(i + 1)).replace(/-$/, ''));
+      if(t !== undefined) {
+        return t + Steno.dictionary['-' + c];
+      }
+    } else if(/[\/-AO\*EU]/.test(c)) {
+      // We've moved beyond the right hand of the last stroke
+      break;
+    }
+  }
+  // Sorry, no translation exists
+  return undefined;
+}
+
+// Perform attachment using orthography rules
+// TODO: Suffix "able" can also become "ible"
+function attach(text) {
+  // Remove spaces outside of {^}'s.
+  text = text.replace(/\s+\{\^/g, "{^");
+  text = text.replace(/\^\}\s+/g, "^}");
+  // Remove {}'s. So, "run {^ing}" will now be "run ^ing".
+  text = text.replace(/\{([^\}]+)\}/g, "$1");
+  // Combine ^'s for easier matching. So, "in^^ing will now be "in^ing".
+  text = text.replace(/\^+/g, '^');
+  
+  // Apply suffix rules:
+  // artistic + ly = artistically
+  text = text.replace(/([aeiou])c\^ly\b/g, '$1cally');
+  // establish + s = establishes (sibilant pluralization)
+  text = text.replace(/(s|sh|x|z|zh)\^s\b/g, '$1es');
+  // speech + s = speeches (soft ch pluralization)
+  // Don't apply to garch, iarch, or narch
+  text = text.replace(/(oa|ea|i|ee|oo|au|ou|l|n|(?:(?:[^a]|^)|(?:[^gin]|^)a)r|t)ch\^s\b/g, '$1ches');
+  // cherry + s = cherries (consonant + y pluralization)
+  text = text.replace(/([bcdfghjklmnpqrstvwxz])y\^s\b/g, '$1ies');
+  // die+ing = dying
+  text = text.replace(/ie\^ing\b/g, 'ying');
+  // metallurgy + ist = metallurgist
+  text = text.replace(/([cdfghlmnpr])y\^ist\b/g, '$1ist');
+  // write + en = written
+  text = text.replace(/te\^en\b/g, 'tten');
+  // beauty + ful = beautiful (y -> i)   (but not my ^self -> miself)
+  text = text.replace(/([bcdfghjklnpqrstvwxz]|\Bm)y\^([a-hj-xz])/g, '$1i$2');
+  // narrate + ing = narrating (silent e)
+  text = text.replace(/([bcdfghjklmnpqrstuvwxz])e\^([aeiouy])/g, '$1$2');
+  // defer + ed = deferred (consonant doubling)   (but not -or, e.g. monitor)
+  text = text.replace(/([bcdfghjklmnprstvwxyz]|qu)(?:([aeiou])([bcdfgklmnptvz])|([aeiu])(r))\^([aeiouy])/g, '$1$2$3$3$4$5$5$6');
+  // Any remaining ^'s are just straight concatenation
+  text = text.replace(/\^/g, '');
+  
+  return text;
+}
+
+// Deal with glue, attachment, capitalization, and {#Return} and {#Tab}.
+// Assumes that it is operating on whole words (no attachment at the start).
+function deMetafy(text, start, end) {
+  // Could be called from reverse lookup
+  if(!text) return text;
+  
+  // Assume not capitalizing next word, then update as we go
+  end.capitalize = false;
+  // Replace meta-commands. They turn into HTML later.
+  text = text.replace(/\s*\{#Return\}\s*/g, '\n');
+  text = text.replace(/\s*\{#Tab\}\s*/g, '\t');
+  // Start assuming glue after; if it is not combined then we are not gluing at the end.
+  // Also start assuming a space before; if gluing it will be eliminated.
+  text = (start.glue ? '{&}' : '') + (start.space ? ' ' : '') + (start.capitalize ? cap(text) : text) + '{&} ';
+  
+  // Deal with capitalization
+  function cap(text, index) {
+    // Capitalize next letter, or hold for next word
+    end.capitalize = true;
+    return text.replace(/[A-Z]/i, function(match) {
+      end.capitalize = false; 
+      return match.toUpperCase();
+    });
+  }
+  // Capitalize automatically after a sentence stop
+  text = text.replace(/\{\.|!|\?\}/g, '$&{-|}');
+  // Explicit capitalization mark
+  var i;
+  while((i = text.indexOf('{-|}')) != -1) {
+    text = text.substring(0, i) + cap(text.substring(i + 4));
+  }
+  // Sentence breaks and stops - no space before, space after if not end of word.
+  text = text.replace(/\s*\{(,|:|;|\.|!|\?)\}\s*$/g, '$1');
+  text = text.replace(/\s*\{(,|:|;|\.|!|\?)\}\s*/g, '$1 ');
+  
+  // Glue flag: Space before and after, but not between two glued items
+  var found = true;
+  while(found) {
+    found = false;
+    text = text.replace(/\{&([^\}]*)\}\s*\{&([^\}]*)\}/, function(m, a, b) { 
+      found = true;
+      return '{&' + a + b + '}'; 
+    });
+  }
+  end.glue = (text.substring(text.length - 4) != '{&} ');
+  text = text.replace(/\{&([^\}]*)\}/g, '$1');
+  
+  // Apply attachment (^) rules.
+  text = attach(text);
+  
+  // HTML-ify meta commands
+  text = text.replace(/\n\s+/g, '<br/>');
+  text = text.replace(/\t\s+/g, '&nbsp;&nbsp;&nbsp;&nbsp;');
+  
+  end.space = false;
+  text = text.replace(/\s+$/, function(a) { end.space = true; return ''; });
+
+  return text;
+}
+
+// State represents all the state of the output stream that is
+// not just the text - things like capitalization and glue.
+// There is a State in between each pair of Words. Since by
+// definition a word is not attached to anything before or after,
+// there is no need to account for attachment here.
+function State(capitalize, glue, space) {
+  this.capitalize = capitalize || false;
+  this.glue = glue || false;
+  this.space = space || false;
+}
+
+// Filled in with the actual number above
+var maxStrokesInTranslation = 10;
+
+// A list of translations, which can accept new strokes or retractions
+function StrokeBuffer() {
+  this.translations = [];
+}
+StrokeBuffer.prototype = {
+  // Retract the latest stroke, updating translations accordingly
+  retract: function() {
+    if(this.translations.length == 0) return;
+    // Retract the last translation, then replay any earlier strokes in it
+    this.translations.pop().retractOneStroke(this);
+    this.checkCorrections();
+  },
+  appendInternal: function(stroke, time) {
+    var strokes = stroke;
+    var combined = [ stroke ];
+    for(var i = this.translations.length - 1; i >= 0; --i) {
+      strokes = this.translations[i].strokes + '/' + strokes;
+      if(count(strokes) > maxStrokesInTranslation) break;
+      combined.push(strokes);
+    }
+    // Find a valid translation
+    var translation = undefined;
+    for(i = combined.length - 1; ; i--) {
+      translation = lookUp(combined[i]);
+      if(translation || i == 0) break;
+    }
+    // Remove i translations, then add the new translation
+    var retractions = [];
+    this.translations.splice(this.translations.length - i, i).forEach(function(t) {
+      if(t.retractions) {
+        retractions = retractions.concat(t.retractions);
+      }
+      t.retract(); 
+    });
+    this.translations.push(new Translation(combined[i], translation, 
+                    this.translations.last(), retractions, time));
+  },
+  // Add a stroke, updating translations
+  append: function(stroke, time) {
+    this.appendInternal(stroke, time);
+
+    var last = this.lastTranslation();
+    if(/[a-z]/i.test(last.text) && last.word.previous && last.word.isPartial()) {
+      // If appending to a word with fingerspelling, retract the previous correction
+      last.word.previous.removeCorrection();
+    }
+    
+    this.checkCorrections();
+  },
+  appendText: function(text) {
+    // Push translations with no strokes.
+    // Append to last translation if it matches type
+    var last = this.lastTranslation();
+    var added = false;
+    for(var i = 0; ; i++) {
+      if(i < text.length && last && last.appendChar(text.charAt(i))) {
+        added = true;
+      } else {
+        if(added) {
+          last.word.updateDisplay();
+          last.word.removeCorrection();
+          this.checkCorrections();
+        }
+        if(i >= text.length) return;
+        last = new Translation(undefined, text.charAt(i), last);
+        added = true;
+        this.translations.push(last);
+      }
+    }
+  },
+  backspace: function() {
+    // If last is typed text, just take away one char and retract if empty.
+    // Otherwise, convert last to typed text.
+    var last = this.lastTranslation();
+    if(!last) return;
+    
+    if(last.strokes) {
+      // Retract last word and convert to typing
+      last.word.retractWord();
+      this.translations.splice(this.translations.length - last.word.translations.length, last.word.translations.length)
+        .forEach(function(a) { a.transferRetractions(this.lastTranslation()); }, this);
+      
+      this.appendText(last.word.text + (last.word.space ? last.word.space.text() : ''));
+      last = this.lastTranslation();
+    }
+    if(last.backspace()) {
+      this.translations.pop();
+    }
+    this.checkCorrections();
+  },
+  // Check for corrections of the last few words
+  checkCorrections: function() {
+    if(this.translations.length == 0 || !/[a-z\-]/i.test(this.lastTranslation().text)) return;
+    // Create a correction if possible
+    var rep = '';
+    var strokeCount = 0;
+    var reps = [];
+    var counts = [];
+    var words = [];
+    for(var word = this.translations.last().word; word; word = word.previous) {
+      rep = (word.space ? ' ' : '') + word.text.toLowerCase() + rep;
+      if(!/^(?:\s*[a-z\-]*){1,4}$/.test(rep)) {
+        break;
+      }
+      strokeCount += word.countStrokes();
+      words.push(word);
+      reps.push(rep.trim());
+      counts.push(strokeCount);
+    }
+    for(var i = reps.length - 1; i >= 0; i--) {
+      // Don't process partial fingerspelled words or partial overlap with previous correction
+      if(words[i].isPartial() || this.partialOverlap(words, i + 1)) continue;
+
+      var corrections = counts[i] > 1 && reverseLookup(reps[i], 
+            Math.min(counts[i] - 1, Math.floor(reps[i].length / 2), 6));
+      if(corrections && corrections.length) {
+        // The words here are in reverse order, but that doesn't matter to Correction
+        new Correction(words.slice(0, i + 1), corrections);
+        return;
+      }
+    }
+  },
+  // Check for partial overlap with previous corrections
+  partialOverlap: function(words, end) {
+    for(var i = 0; i < end; i++) {
+      var c = words[i].correction
+      if(c && (c.words.length >= end || c.words.some(function(a) { return words.indexOf(a) < 0; }))) {
+        return true;
+      }
+    }
+    return false;
+  },
+  lastTranslation: function() {
+    return this.translations.last();
+  },
+  getWordCount: function() {
+    var last = this.lastTranslation();
+    return last ? last.word.wordCount : 0;
+  },
+  accumulate: function(strokeCount, callback) {
+    var ret = "";
+    for(var i = this.translations.length - 1; i >= 0 && strokeCount > 0; i--) {
+      var t = this.translations[i];
+      strokeCount -= count(t.strokes);
+      ret = callback(t) + ret;
+    }
+    return ret;
+  },
+  getText: function(strokeCount) {
+    var lastWord;
+    return this.accumulate(strokeCount, function(t) {
+      if(t.word == lastWord) return;
+      lastWord = t.word;
+      return (t.word.space ? t.word.space.text() : "") + t.word.text;
+    });
+  },
+  getStrokes: function(strokeCount) {
+    return this.accumulate(strokeCount, function(t) {
+      return (t.strokes || "<" + t.text + ">") + "/";
+    });
+  },
+};
+
+// Translation represents a translation in the dictionary for a set of strokes.
+// Translations are formed greedily - if two strokes form a translation, they can
+// be combined as a whole with the next stroke but cannot be broken up to form a
+// better combination.
+function Translation(strokes, text, previous, retractions, time) {
+  this.strokes = strokes;
+  this.text = text || strokes;
+  // Append to the previous word if possible; otherwise add a word
+  this.word = !previous ? new Word(this) : 
+        previous.word.append(this) ? previous.word : new Word(this, previous.word);
+  this.time = time;
+  if(retractions && retractions.length) {
+    this.retractions = retractions;
+  }
+}
+Translation.prototype = {
+  retractOneStroke: function(strokeBuffer) {
+    this.retract();
+    var index = this.strokes.lastIndexOf('/');
+    this.retractions = this.retractions || [];
+    this.retractions.unshift(this.strokes.substring(index + 1));
+    if(index >= 0) {
+      this.strokes.substring(0, index).split('/').forEach(function(a) {
+        strokeBuffer.appendInternal(a, this.time); });
+    }
+    this.transferRetractions(strokeBuffer.lastTranslation());
+  },
+  transferRetractions: function(last) {
+    if(last && this.retractions) {
+      last.retractions = (last.retractions ? last.retractions.concat(this.retractions) : this.retractions);
+      last.word.updateDisplay();
+    }
+  },
+  backspace: function() {
+    if(this.text.length <= 1) {
+      this.retract();
+      return true;
+    }
+    this.text = this.text.substring(0, this.text.length - 1);
+    this.word.removeCorrection();
+    this.word.updateDisplay();
+    return false;
+  },
+  retract: function() {
+    this.word.retract(this);
+  },
+  appendChar: function(add) {
+    if(this.strokes || /[a-z\-]+/i.test(add) != /[a-z\-]+/i.test(this.text)) return false;
+    this.text += add;
+    return true;
+  },
+};
+
+// Word represents a series of attached translations. It is linked to an output span.
+function Word(translation, previous) {
+  this.translations = [ translation ];
+  this.previous = previous;
+  this.start = (previous ? previous.end : new State(true, false, false));
+  this.end = new State();
+  this.span = $('<span></span>').appendTo('#output');
+  this.updateDisplay();
+}
+Word.prototype = {
+  // Try to append a translation, returning true on success
+  append: function(translation) {
+    if(!translation.strokes || (!/^\s*\{\^.*[a-z]/.test(translation.text) && 
+          !/[a-z].*\^\}\s*(?:\{-\|\})?\s*$/.test(this.translations.last().text))) {
+      return false;
+    }
+    this.translations.push(translation);
+    this.removeCorrection();
+    this.updateDisplay();
+    return true;
+  },
+  // Remove the correction from this word.
+  removeCorrection: function() {
+    if(this.correction) {
+      this.correction.remove();
+    }
+  },
+  countStrokes: function() {
+    return !this.stroke ? maxStrokesInTranslation + 1 : /[a-z\-]/i.test(this.text) ? count(this.stroke) : 0;
+  },
+  isPartial: function() {
+    // A word with no text is always partial. Otherwise, test if this is a glued letter.
+    return !this.space && this.stroke && this.previous && this.start.glue && this.end.glue;
+  },
+  // Retract the last translation, removing the word if it is now empty
+  retract: function(translation) {
+    this.removeCorrection();
+    this.translations = this.translations.filter(function(t) { return t != translation; });
+    if(this.translations.length == 0) {
+      this.retractWord();
+    } else {
+      this.updateDisplay();
+    }
+  },
+  retractWord: function() {
+    this.span.remove();
+    if(this.space) {
+      this.space.remove();
+    }
+  },
+  // Update the spans that we are displaying
+  updateDisplay: function() {
+    if(!this.translations[0].strokes) {
+      // Typed word, not stroked
+      var text = this.translations[0].text;
+      this.wordCount = (this.previous ? this.previous.wordCount : 1);
+    } else {
+      this.stroke = this.translations.map(function(a) { return a.strokes; }).join('/');
+      this.span.attr('data-raw', this.stroke);
+      
+      var simple = simplify(this.stroke);
+      this.span.attr('data-simple', simple);
+      this.span.attr('data-phonetic', phonetic(simple));
+      
+      var text = deMetafy(this.translations.map(function(a) { return a.text; }).join(''), this.start, this.end);
+
+      this.wordCount = (this.previous ? this.previous.wordCount : 1) + wordCount(text);
+
+      if(this.previous && !/(?:>|\s+)$/.test(this.previous.text) && /^\s+/.test(text)) {
+        // Place spaces in between words, only if not at start of paragraph
+        if(!this.space) this.space = $(document.createTextNode(" ")).insertBefore(this.span);
+      } else if(this.space) {
+        this.space.remove();
+        delete this.space;
+      }
+      text = text.replace(/^\s+/, '');
+    }
+    this.text = text;
+    // Insert retractions. Retractions always go *after* their translation.
+    var html = '';
+    var j = text.length;
+    for(var i = this.translations.length - 1; i >= 0; i--) {
+      var a = this.translations[i];
+      if(this.translations[i].retractions) {
+        html = this.translations[i].retractions.map(function(b) {
+          var s = simplify(b);
+          return '<span class="retracted" data-raw=" ' + b + '" data-simple=" ' + s 
+                      + '" data-phonetic=" ' + phonetic(s) + '"></span>';
+        }).join('') + html;
+      }
+      var root = this.translations[i].text.replace(/i?e$|y$/, '');
+      if(root) {
+        var end = j;
+        j = text.toLowerCase().lastIndexOf(root.toLowerCase(), end - 1);
+        if(i == 0 || j == -1) j = 0;
+        html = text.substring(j, end) + html;
+      }
+    }
+    
+    this.span.html(html);
+  },
+};
+var stenoOrder = [ 
+  "#",
+  "S-", "T-", "K-", "P-", "W-", "H-", "R-", 
+  "A", "O", "*", "E", "U", 
+  "-F", "-R", "-P", "-B", "-L", "-G", "-T", "-S", "-D", "-Z",
+];
+
+function simplify(a) {
+  a = a.replace(/STKPW/g, 'Z');
+  a = a.replace(/S(T?)K(P?)W(H?)R/g, 'J$1$2$3');
+  a = a.replace(/TKPW/g, 'G');
+  a = a.replace(/T(K?)P(W?)HR/g, 'F$1$2L'); // FL, not NR
+  a = a.replace(/T(K?)P(W?)H/g, 'N$1$2');
+  a = a.replace(/K(P?)WHR/g, 'Q$1L'); // QL, not YH
+  a = a.replace(/K(P?)W(H?)R/g, 'Y$1$2');
+  a = a.replace(/SR/g, 'V'); // Not STR, SHR, etc.
+  a = a.replace(/TK/g, 'D');
+  a = a.replace(/T(K?)P/g, 'F$1'); // DP, not FK
+  a = a.replace(/PW/g, 'B'); // FW, not TB
+  a = a.replace(/((?:^|\/)[KPW]*)HR/g, '$1L'); // Not SHR or THR
+  a = a.replace(/P(W?)H/g, 'M$1'); // PL, not MR
+  a = a.replace(/KP/g, 'X');
+  
+  a = a.replace(/EU/g, 'I');
+  
+  a = a.replace(/PBLG/g, 'J');
+  a = a.replace(/B(L?)G(T?)S/g, 'X$1$2');
+  a = a.replace(/PB/g, 'N');
+  a = a.replace(/P(B?)L/g, 'M$1'); // MB, not NL
+  a = a.replace(/B(L?)G/g, 'K'); // NG, not PK
+  
+  return a;
+}
+
+function phonetic(a) {
+  // Move * to the end, leaving a - in its place if necessary
+  a = a.replace(/(^|[\/\#STKPWHR])\*([FRPBLGTSDZNMKXJ]*(?:$|\/))/g, '$1-$2*');
+  a = a.replace(/\*([EUIFRPBLGTSDZNMKXJ]*)/g, '$1*');
+  // Some more endings
+  a = a.replace(/FRPB/g, 'nch');
+  a = a.replace(/FRB/g, 'rv');
+  a = a.replace(/R(P?)B/g, 'sh$1');
+  a = a.replace(/F(R?)P/g, 'ch$1');
+  // Phonetic vowels
+  a = a.replace(/AOI/g, '\u012B');
+  a = a.replace(/AI/g, '\u0101');
+  a = a.replace(/AOU/g, '\u016B');
+  a = a.replace(/AOE/g, '\u0113');
+  a = a.replace(/OE/g, '\u014D');
+  a = a.replace(/AE/g, 'EA');
+  a = a.replace(/AO/g, 'OO');
+  
+  // Change slashes into spaces, and make lowercase
+  a = a.replace(/\//g, ' ').toLowerCase();
+  
+  return a;
+}
+
+function correctionSpan(corrections) {
+  return '<span>' + (corrections.length == 1 ? '=' : 
+      '<span><p>=' + corrections.slice(1).join('<br/>=') + '</p>=</span>') + corrections[0] + '</span>';
+}
+
+// A correction, which applies to multiple words
+function Correction(words, corrections) {
+  this.words = words;
+  this.words.forEach(function(word) {
+    word.removeCorrection();
+    word.correction = this; 
+    word.span.addClass("corrected"); 
+  }, this);
+  var html = '<span class="correction">' + correctionSpan(corrections);
+  corrections.mapInPlace(simplify);
+  html += correctionSpan(corrections);
+  corrections.mapInPlace(phonetic);
+  html += correctionSpan(corrections) + '</span>';
+  this.span = $(html).appendTo('#output');
+};
+Correction.prototype = {
+  remove: function() {
+    this.words.forEach(function(word) { 
+      delete word.correction;
+      word.span.removeClass("corrected");
+    });
+    this.span.remove();
+  },
+};
+
+function Timer() {
+  this.time = 0;
+}
+Timer.prototype = {
+  update: function() {
+    var now = new Date().getTime();
+    if(!this.timeout) {
+      this.then = now;
+      this.setTimeout(now);
+    } else {
+      this.time += now - this.then;
+      this.then = now;
+    }
+    return this.time;
+  },
+  setTimeout: function(now) {
+    this.timeout = window.setTimeout(
+        (function(t) { return function() { t.tick(); } })(this),
+        1000 - (this.time + now - this.then) % 1000);
+  },
+  reset: function() {
+    if(this.timeout) {
+      window.clearTimeout(this.timeout);
+      delete this.timeout;
+    }
+    this.time = 0;
+    $('#time').html('0:00');
+  },
+  tick: function() {
+    function pad(a) {
+      var s = '00' + a;
+      return s.substring(s.length - 2);
+    }
+    var now = new Date().getTime();
+    if(now - this.then > 10000) {
+      // Pause the timer if it runs more than 10s without an event
+      this.time += 10000;
+      delete this.timeout;
+    } else {
+      this.setTimeout(now);
+    }
+    var sec = Math.floor((this.getTime(now) + 50) / 1000);
+    var min = Math.floor(sec / 60);
+    var hour = Math.floor(min / 60);
+    min %= 60;
+    sec %= 60;
+    
+    $('#time').html((hour ? hour + ':' + pad(min) : min) + ':' + pad(sec));
+  },
+  getTime: function(now) {
+    return this.time + (this.timeout ? (now || new Date().getTime()) - this.then : 0);
+  },
+};
+
+var debugInfo;
+
+function startEngine() {
+  // All keys currently down
+  var downKeys = {};
+  
+  // All keys stroked in the current chord
+  var chordKeys = {};
+  
+  // Output words, linked to spans
+  var buffer = new StrokeBuffer();
+
+  // Tracks active time since you began typing
+  var timer = new Timer();
+  
+  // Record keydown, starting a new stroke if no keys are down.
+  $('#input').keydown(function(event) {
+    // Don't block tab
+    if(event.which == 9) return;
+
+    if($.isEmptyObject(downKeys)) {
+      chordKeys = {};
+      // In case invalid strokes added text
+      $(this).val('');
+    }
+    // Need to track what is down, but also all keys pressed in the chord
+    downKeys[event.which] = true;
+    chordKeys[keyCodeToSteno[event.which] || 'invalid'] = true;
+    if(!chordKeys['invalid']) event.preventDefault();
+  });
+  
+  // On keyup, check if we have finished a chord.
+  $('#input').keyup(function(event) {
+    // Don't block tab
+    if(event.which == 9 || !downKeys[event.which]) return;
+    
+    delete downKeys[event.which];
+    
+    // Check if valid steno. If not, allow the keystroke to go through.
+    if(chordKeys['invalid']) {
+      // Allow keystrokes to go through if they are not steno
+      return;
+    }
+    event.preventDefault();
+    if(!$.isEmptyObject(downKeys)) {
+      return;
+    }
+    // End of a stroke. Create the chord outline from the keys-down.
+    var chord = stenoOrder.filter(function(a) { return chordKeys[a]; })
+        .join('').replace(/([A-Z\*\-])-(?=[A-Z\*])/g, '$1').replace(/-$/, '');
+
+    var time = timer.update();
+    
+    if(chord == '*') {
+      buffer.retract();
+    } else {
+      buffer.append(chord, time);
+      updateGraph();
+    }
+
+    var minutes = time / (60 * 1000);
+    var words = buffer.getWordCount();
+    
+    $('#words').html(words);
+    $('#wpm').html(minutes && words ? (words / minutes).toFixed(1) : '');
+    if(words == 0) {
+      // Deleted back to the start (probably started with wrong keyboard layout)
+      timer.reset();
+    }
+    window.scrollTo(0, document.body.scrollHeight);
+  });
+  
+  // Reset keyboard state on window losing focus (or gaining it again)
+  $('#input').on('blur', 'focus', function() {
+    downKeys = {};
+    chordKeys = {};
+  });
+  $('#keyboard').on('change keydown keyup keypress paste input', function() {
+    var text = $(this).val();
+    if(text) {
+      $(this).val('');
+      buffer.appendText(text);
+      window.scrollTo(0,document.body.scrollHeight);
+    }
+  });
+  $('#keyboard').keydown(function(event) {
+    if(event.which == 8) {
+      buffer.backspace();
+    }
+  });
+  
+  $('#raw,#simple,#phonetic').click(function() {
+    $('#output').removeClass('raw simple phonetic').addClass($(this).attr('id'));
+  });
+  $('#qwerty,#dvorak,#colemak').click(function() {
+    keyCodeToSteno = keyboards[$(this).attr('id')];
+  });
+  $('#corrections').click(function() {
+    $('#output').toggleClass('correct');
+  });
+  $('#retractions').click(function() {
+    $('#output').toggleClass('retract');
+  });
+  $('#settings').click(function() {
+    $('#settingsPanel').toggleClass('show');
+    $('#helpPanel').removeClass('show');
+  });
+  $('#help').click(function() {
+    $('#helpPanel').toggleClass('show');
+    $('#settingsPanel').removeClass('show');
+  });
+  $('.close').click(function() {
+    $('#settingsPanel').removeClass('show');
+    $('#helpPanel').removeClass('show');
+  });
+  $('#graphing').click(function() {
+    $('#graph').toggleClass('show');
+    updateGraph();
+  });
+
+  // Set up everything to match what is currently selected, because
+  // the browser may have preserved selections from the last time I
+  // was on this page.
+  if(!$('#corrections').is(':checked')) $('#output').removeClass("correct");
+  if($('#retractions').is(':checked')) $('#output').addClass("retract");
+  if($('#graphing').is(':checked')) {
+    $('#graph').addClass("show");
+    updateGraph();
+  }
+
+  $('#raw,#simple,#phonetic,#qwerty,#dvorak,#colemak')
+    .filter(":checked")
+    .each(function() { $(this).click(); });
+  
+  function wordsPerMinute(a, b) {
+    return b ? (a.word.wordCount - b.word.wordCount) * 60 * 1000 / (a.time - b.time) :
+          a.word.wordCount * 60 * 1000 / a.time;
+  }
+  
+  function updateGraph() {
+    var graph = $('#graph');
+    if(!graph.hasClass('show')) return;
+    
+    var g = graph.get(0).getContext('2d');
+    var t = buffer.translations;
+    
+    g.fillStyle = "white";
+    g.fillRect(0, 0, 516, 100);
+    
+    g.beginPath();
+    g.moveTo(516, 100);
+    g.lineTo(0, 100);
+    
+    if(t.length <= 10) {
+      g.lineTo(0, 50);
+      g.lineTo(516, 50);
+    } else {
+      var speedScale = -50 / wordsPerMinute(t.last());
+      var timeScale = 516 / t.last().time;
+      
+      g.lineTo(0, 100 + speedScale * wordsPerMinute(t[10]));
+      for(var i = 10; i < t.length; i++) {
+        g.lineTo(timeScale * t[i].time, 100 + speedScale * wordsPerMinute(t[i], t[i - 10]));
+      }
+    }
+    g.closePath();
+    g.fillStyle = '#AAF';
+    g.fill();
+    
+    g.strokeStyle = 'red';
+    g.beginPath();
+    g.moveTo(0, 50.5);
+    g.lineTo(516, 50.5);
+    g.stroke();
+  }
+
+  var hover;
+  function clearHover() {
+    if(hover) {
+      hover.word.span.removeClass("selected");
+      hover = undefined;
+    }
+  }
+  
+  $('#graph').mouseleave(clearHover);
+  
+  $('#graph').mousemove(function(e) {
+    clearHover();
+    var t = buffer.translations;
+    if(t.length == 0) return;
+    
+    var time = t.last().time * (e.pageX - $(this).offset().left) / 516;
+    var i = t.binarySearch(time, function(a, b) { return a < b.time ? -1 : a > b.time ? 1 : 0; });
+    hover = t[Math.min(t.length - 1, i < 0 ? -1 - i : i)];
+    hover.word.span.addClass("selected");
+    
+    window.scrollTo(0, Math.max(0, hover.word.span.offset().top - 150));
+  });
+  
+  $('#graph').click(function() { $('#input').focus(); });
+
+  window.onbeforeunload = function(e) {
+    if(buffer.getWordCount() && $('#warn').is(':checked')) {
+       return e.returnValue = "Text typed here will not be saved.";
+    }
+  };
+
+  $('#input').focus();
+
+  // Clear "Loading dictionary..."
+  $('#output').html('');
+
+  var version = "2014-03-12";
+
+  debugInfo = function() {
+    console.log("Version: " + version + "\n");
+    console.log("Text: " + buffer.getText(60));
+    console.log("Strokes: " + buffer.getStrokes(60));
+  }
+}
+// TODO:
+// 1) Special orthography rules to recognize when -BL is -ible?
+// 2) Any time that we remove a correction due to retracting or combination, new corrections behind it may emerge.
+//    (use the word list of the correction; try correcting starting from each word in turn)
+// 3) Orthography still fails occasionally; add dictionary like in Plover?
+// 4) Improved simple/phonetic strokes using translation to decide ambiguous letters (sl vs shr).
+// 5) Colorblind-friendly colors
+</script>
+<style>
+body {
+  margin: 8px;
+}
+#graph {
+  display: none;
+  position: fixed;
+  top: 0px;
+  left: 0px;
+  z-index: 2;
+}
+#output {
+  min-height: 500px;
+  width: 500px;
+  line-height: 1.4em;
+  margin-bottom: 1em;
+}
+canvas.show + #output {
+  margin-top: 100px;
+  min-height: 408px;
+}
+div > span {
+  border-bottom: 2px solid transparent;
+}
+div > span:not(.correction):hover, div.correct > span.corrected:hover {
+  border-bottom: 2px solid #AAF;
+}
+div > span:not(.correction):hover:before {
+  position: relative;
+  display: inline-block;
+  z-index: 1;
+  top: 1.2em;
+  width: 0;
+  height: 0;
+  overflow: show;
+  color: #FFF;
+  text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+  white-space: nowrap;
+}
+span.selected {
+  background-color: #AAF;
+}
+span.correction {
+  background-color: #ACA;
+  display: none;
+}
+div.correct span.correction {
+  display: inline;
+}
+span.correction span {
+  display: none;
+}
+span.correction span span {
+  position: relative;
+  display: inline-block;
+}
+span.correction span span p {
+  position: absolute;
+  white-space: nowrap;
+  display: none;
+  top: 100%;
+  margin: 0;
+  background-color: #BFB;
+  z-index: 1;
+}
+span.correction:hover {
+  background-color: #BFB;
+}
+span.correction:hover span span p {
+  display: inline-block;
+}
+div.raw span.correction span:nth-child(1) {
+  display: inline;
+}
+div.simple span.correction span:nth-child(2) {
+  display: inline;
+}
+div.phonetic span.correction span:nth-child(3) {
+  display: inline;
+}
+div.correct span.corrected {
+  border-bottom: 2px solid #ACA;
+}
+div.raw > span:not(.correction):hover:before {
+  content: attr(data-raw);
+}
+div.simple > span:not(.correction):hover:before {
+  content: attr(data-simple);
+}
+div.phonetic > span:not(.correction):hover:before {
+  content: attr(data-phonetic);
+}
+div.raw span.retracted:before {
+  content: attr(data-raw);
+}
+div.simple span.retracted:before {
+  content: attr(data-simple);
+}
+div.phonetic span.retracted:before {
+  content: attr(data-phonetic);
+}
+span.retracted {
+  background-color: #DAA;
+  display: none;
+}
+div.retract span.retracted {
+  display: inline;
+}
+.settings {
+  border-radius: 10px;
+  box-shadow: 2px 2px 10px rgba(0,0,0,0.8);
+  padding: 10px;
+  padding-right: 40px;
+  margin: 0px;
+  position: absolute;
+  display: none;
+  bottom: 100%;
+  left: 0px;
+  background: #EEE;
+  z-index: 4;
+}
+#settingsPanel {
+  white-space: nowrap;
+}
+#helpPanel {
+  width: 520px;
+}
+div.show {
+  display: block;
+}
+#graph.show {
+  display: block;
+}
+span.settingsSource {
+  position: relative;
+}
+.close {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+}
+#time, #words, #wpm {
+  display: inline-block;
+  min-width: 6em;
+}
+</style>
+</head><body>
+  <canvas id="graph" width="516" height="100"></canvas>
+  <div id="output" class="raw correct">Loading dictionary...</div>
+  <span class="settingsSource">
+    <div class="settings" id="settingsPanel">
+      <i>Stroke display: </i>
+      <input type="radio" name="strokes" id="raw" checked="true"><label for="raw">Raw</label>
+      <input type="radio" name="strokes" id="simple"><label for="simple">Simple</label>
+      <input type="radio" name="strokes" id="phonetic"><label for="phonetic">Phonetic</label>
+      <br><br>
+      <i>Keyboard layout: </i>
+      <input type="radio" name="keyboard" id="qwerty" checked="true"><label for="qwerty">Qwerty</label>
+      <input type="radio" name="keyboard" id="dvorak"><label for="dvorak">Dvorak</label>
+      <input type="radio" name="keyboard" id="colemak"><label for="colemak">Colemak</label>
+      <input class="close" type="button" value="X">
+      <br><br>
+      <input type="checkbox" id="warn"><label for="warn">Warn on leaving page</label>
+    </div>
+    <div class="settings" id="helpPanel">
+One way to use this: Transcribe normally, and watch for improved strokes
+to be suggested. Suggestions are shown if a word can be stroked with fewer
+strokes than you used. You can hover a suggestion to see other options.
+<br><br>
+If you can't figure out how to stroke a word, fingerspell it or tab over to the
+keyboard input field and type it normally. A suggested stroke will be shown.
+<br><br>
+Turn off suggestions for clean text to copy and paste into another program.
+<br><br>
+Another way to use this: Type up a full passage, then review. Turn on
+the WPM graph and hover over a slow section to see what you struggled with. Or,
+turn on display of retractions and see where you made several tries at a word.
+You can also hover the mouse over a word to see how you stroked it.
+<br><br>
+A third option: Paste a passage into the keyboard input field. It will be
+annotated with how to stroke it. Type those strokes to reproduce the passage.
+This can be helpful when first learning.
+<br><br>
+Settings allow you to change the stroke display mode for easier reading. You can
+also tell the program what keyboard layout you use so that steno strokes will be
+properly recognized. Finally, you can turn on a warning so that you won't
+accidentally leave the page before copying out the text you have typed.
+<br><br>
+If you would like to use this program offline, you can <a href="assets/stenoLearner.zip">download it here</a>.
+      <input class="close" type="button" value="X">
+    </div>
+  </span>
+  <input type="button" id="settings" value="Settings...">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <input type="checkbox" id="corrections" checked="true"><label for="corrections">Suggestions</label>
+  <input type="checkbox" id="retractions"><label for="retractions">Retractions</label>
+  <input type="checkbox" id="graphing"><label for="graphing">Graph</label>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <input type="button" id="help" value="?">
+  <br/>
+  Time: <span id="time">0:00</span>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  Words: <span id="words">0</span>
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  WPM: <span id="wpm">0</span>
+  <br/>
+  <label for="input">Steno input:</label><input type="text" id="input">
+  <label for="keyboard">Keyboard input:</label><input type="text" id="keyboard">
+</body></html>
