@@ -7,7 +7,7 @@ This is going to be like Steno Hero, but BETTER.
 The primary innovations are:
 
 1. Different difficulty levels.  You have to be PRETTY good at
-steno to do song lyrics, which means newbies are missing out on
+steno to do song data, which means newbies are missing out on
 the fun.  One way to solve this problem is to SIMPLIFY what you
 actually have to stroke out.  We'll have these modes:
 
@@ -36,7 +36,7 @@ Lots of code shamelessly ripped off from QWERTY Steno.
 
 UI Notes:
 
-1. What should happen when we move onto the next cue?  Some lyrics
+1. What should happen when we move onto the next cue?  Some data
 files may switch to the next lyric early in order to accommodate the
 karaoke use-case, but we want to give a stenographer some grace period
 before moving on.  Idea: when the cue file indicates the next cue is
@@ -62,39 +62,87 @@ words somehow?  Seems algorithmically tricky.
 .nostroke {color: purple;}
 .done {color: grey !important;}
 .current {background:#DDD}
+.complete {background:#9F9}
 #chkPlainTextInput {display: none}
+.boxLabel {margin-right:1em;}
+h2 {font-size:1.2em;}
+td {vertical-align: top;}
 </style>
 <body>
-<div id="viewport">&nbsp;</div>
+<div id="viewport"><em>Loading Dictionary...</em></div>
+<div>
 <input type="text" id="txtInput">
 <input type="submit" value="&lt;" id="prevbtn">
 <input type="submit" value="&gt;" id="nextbtn">
+</div>
+<div id="barometer"></div>
 <span id="prompt"></span>
 <input type="checkbox" id="chkPlainTextInput">
-<br>
-<textarea id="lyrics">A test input.</textarea>
+<hr>
+<p>
+How to use me: copy paste some exercise material (for example, the exercises in <a href="https://sites.google.com/site/ploverdoc/lesson-1-fingers-and-keys">Learn Plover</a>) and select what kind of exercise you want to do.
+</p>
+<h2>Mode:</h2>
+<table id="modebtns">
+    <tr>
+        <td><input type="radio" name="mode" value="accuracy" onclick="updateMode()" checked></td>
+        <td><strong class="boxLabel">Accuracy</strong> If you misstroke, the stroke is rejected; you cannot move on until you get the stroke right.</td>
+    </tr>
+    <tr>
+        <td><input type="radio" name="mode" value="speed" onclick="updateMode()" disabled></td>
+        <td><strong class="boxLabel">Speed</strong> If you misstroke a word, you'll move onto the next one.  (Not implemented)</td>
+    </tr>
+</table>
+<h2>Style:</h2>
+<table id="stylebtns">
+    <tr>
+        <td><input type="radio" name="style" value="script" checked></td>
+        <td><strong class="boxLabel">Script</strong> Follow the script in the source order.</td>
+    </tr>
+    <tr>
+        <td><input type="radio" name="style" value="randomized"></td>
+        <td><strong class="boxLabel">Randomized</strong> Generate <input type="text" id="randomLength" value="100" size="1"> random words sampled from the source input (weighted based on occurrence frequency).</td>
+    </tr>
+</table>
+<h2>Difficulty:</h2>
+<table id="difficultybtns">
+    <tr>
+        <td><input type="radio" name="difficulty" value="vowel" checked></td>
+        <td><strong class="boxLabel">Vowels only</strong> You only need to stroke
+            the AOEU keys of any word to be stroked.  Solitary briefs
+            (which aren't spelled phonetically) are omitted.
+        </td>
+    </tr>
+    <tr>
+        <td><input type="radio" name="difficulty" value="leftvowel"></td>
+        <td><strong class="boxLabel">Left hand</strong> You only need to stroke
+            the left hand keys and all vowels.
+        </td>
+    </tr>
+    <tr>
+        <td><input type="radio" name="difficulty" value="rightvowel"></td>
+        <td><strong class="boxLabel">Right hand</strong> You only need to stroke
+            the right hand keys and all vowels.  This difficulty mode may not make much
+            sense on exercises with multi-stroke words.
+        </td>
+    </tr>
+    <tr>
+        <td><input type="radio" name="difficulty" value="standard"></td>
+        <td><strong class="boxLabel">Case-insensitive, no punctuation</strong>
+            Stroke your way to victory.
+        </td>
+    </tr>
+</table>
 <input type="submit" value="Clear" id="clearbtn">
 <input type="submit" value="Load" id="loadbtn">
+        <div><textarea id="data" cols="80" rows="20">
+The quick brown fox jumps over the lazy dog.
+Pack my box with five dozen liquor jugs.
+</textarea></div>
 <script>
-$("#txtInput").val(""); // force empty
-
-function cursor() {
-    var data = [];
-    var cur_line = 0;
-    var cur_word = -1;
-    var node = $("<div>");
-    var my = {};
-    my.paint = function paint() {
-    }
-    return my;
-}
-
-// list of list of words (no punctuation)
-var lyrics, cur_line, cur_word;
-var cur_elems;
-var currentStroke = 1;
+// ----------------------------------------------------------------------------
+// Dictionary initialization
 var rdata = {"i": ["EU"]};
-
 $.getJSON("dict.json", function(dict) {
         $.each( dict, function(k,rv) {
             if (/\d/.test(k)) return;
@@ -107,63 +155,222 @@ $.getJSON("dict.json", function(dict) {
             });
         init();
         });
-function init() {
-    $("#loadbtn").click(loadLyrics);
-    $("#clearbtn").click(function() {$("#lyrics").val("")});
-    $("#txtInput").keyup(keyUp).keydown(keyDown);
-    $("#prevbtn").click(function() {
-        if (cur_line == 0) return;
-        var i = 1;
-        var old_cur_line = cur_line;
-        while (cur_line >= old_cur_line && cur_line - i >= 0) {
-            cur_line -= i;
-            cur_word = -1;
-            paintLine();
-            i++;
+
+function depunctuateWord(rword) {
+    return rword.replace(/[!"#$%&\\\(\)*+,-.\/:;<=>?@\[\]\^_`{|}~]/g, "").replace(/^'/, "").replace(/'$/, "");
+}
+function cleanWord(rword) {
+    return depunctuateWord(rword).toLowerCase();
+}
+function wordStrokes(word) {
+    var r = rdata[cleanWord(word)];
+    return r ? r : [];
+}
+function vowelifyStroke(stroke) {
+    var r = [];
+    var parts = stroke.split('/');
+    for (var i = 0; i < parts.length; i++) {
+        var m = parts[i].match(/[AOEU]+/);
+        if (m && parts[i].indexOf("*") == -1) {
+            r.push(m[0]);
+        } else {
+            return false;
         }
-        });
-    $("#nextbtn").click(function() {
-        if (cur_line == lyrics.length - 1) return;
-        cur_line++;
-        cur_word = -1;
-        paintLine();
-        });
-    loadLyrics();
+    }
+    return r.join('/');
 }
-function loadLyrics() {
-    lyrics = [];
-    var text = $("#lyrics").val();
-    var lines = text.split("\n");
-    $.each( lines, function(i,line) {
-            var cur = [];
-            var words = line.split(" ");
-            $.each( words, function(i,word) {
-                    if (/\S/.test(word)) cur.push(word);
-                });
-            if (cur.length > 0) lyrics.push(cur);
+function leftifyStroke(stroke) {
+    var steno = stroke.split('/')[0];
+    var left = getLeftLettersFromSteno(steno);
+    return left;
+}
+function rightifyStroke(stroke) {
+    var steno = stroke.split('/')[0];
+    var right = getRightLettersFromSteno(steno);
+    return right;
+}
+function leftifyVowelStroke(stroke) {
+    var steno = stroke.split('/')[0];
+    var left = getLeftLettersFromSteno(steno);
+    var middle = getMiddleLettersFromSteno(steno);
+    return left + middle;
+}
+function rightifyVowelStroke(stroke) {
+    var steno = stroke.split('/')[0];
+    var middle = getMiddleLettersFromSteno(steno);
+    var right = getRightLettersFromSteno(steno);
+    return middle + right;
+}
+function bestStroke(strokes) {
+    var cand;
+    $.each(strokes, function(i, s) {
+            cand = take_best(cand, s);
             });
-    startLyrics();
-}
-function startLyrics() {
-    cur_line = 0;
-    cur_word = -1;
-    paintLine();
+    return cand;
 }
 function solitaryBrief(word) {
     if (cleanWord(word) == "it's") return true;
     return wordStrokes(word).every(function(s) {return vowelifyStroke(s) == s && !s.match(/^[AOEU\/]+$/)});
 }
+// TODO: lift "chordifying" code from https://plover.goeswhere.com/
+// so we can get per-chord stats
+
+// ----------------------------------------------------------------------------
+// Main user interface
+var data, cur_line, cur_word;
+var cur_elems;
+var currentStroke = 1;
+var cur_mode, cur_difficulty, cur_style;
+var cur_difficulty_transform;
+var samples; // {time: Date, start_time: Date, expected_strokes: [String], actual_stroke: String, line: Number, word: Number}
+var stroke_start, exercise_start;
+var streak = 0;
+var best_streak = 0;
+
+function updateMode() {
+    cur_mode = $('input[name=mode]:checked', '#modebtns').val();
+}
+
+function updateDifficulty() {
+    cur_difficulty = $('input[name=difficulty]:checked', '#difficultybtns').val();
+    if (cur_difficulty == "vowel") {
+        cur_difficulty_transform = vowelifyStroke;
+    } else if (cur_difficulty == "left") {
+        cur_difficulty_transform = leftifyStroke;
+    } else if (cur_difficulty == "right") {
+        cur_difficulty_transform = rightifyStroke;
+    } else if (cur_difficulty == "leftvowel") {
+        cur_difficulty_transform = leftifyVowelStroke;
+    } else if (cur_difficulty == "rightvowel") {
+        cur_difficulty_transform = rightifyVowelStroke;
+    } else {
+        cur_difficulty_transform = function(s) {return s;}
+    }
+}
+
+function updateStyle() {
+    cur_style = $('input[name=style]:checked', '#stylebtns').val();
+}
+
+function updateBarometer() {
+    if (!exercise_start) {
+        exercise_start = new Date();
+    }
+    var wpm = Math.round((1000 * 60 * (data[cur_line].index + cur_word)) / ((new Date()).getTime() - exercise_start.getTime()));
+    if (wpm > 300) { wpm = 300; }
+    // ToDo: WPM is not really right, but doing it this way
+    // so that the easier difficulty modes are not completely
+    // bogus
+    $('#barometer').html(cur_line + "/" + data.length + " <strong>WPM:</strong> " + wpm + ", <strong>Streak:</strong> " + streak + " (best: " + best_streak + ")");
+}
+
+// hmm, I don't know what to actually do with this data
+function addSample(actual, expecteds) {
+    /*
+    samples.push({time: new Date(),
+                  start_time: stroke_start,
+                  actual_stroke: actual,
+                  expected_strokes: expecteds,
+                  line: cur_line,
+                  word: cur_word});
+                  */
+    updateBarometer();
+}
+
+function init() {
+    $("#txtInput").val(""); // force empty
+    $("#loadbtn").click(loadData);
+    $("#clearbtn").click(function() {$("#data").val("")});
+    $("#txtInput").keyup(keyUp).keydown(keyDown);
+    $("#prevbtn").click(function() {
+            if (cur_line == 0) {
+                cur_word = -1;
+                paintLine();
+                return;
+            }
+            var i = 1;
+            var old_cur_line = cur_line;
+            while (cur_line >= old_cur_line && cur_line - i >= 0) {
+                cur_line -= i;
+                cur_word = -1;
+                paintLine();
+                i++;
+            }
+        });
+    $("#nextbtn").click(function() {
+        if (cur_line == data.length - 1) return;
+        cur_line++;
+        cur_word = -1;
+        paintLine();
+        });
+    loadData();
+    updateMode();
+}
+function loadData() {
+    data = [];
+    var text = $("#data").val();
+    var lines = text.split("\n");
+    var c = 0;
+    updateStyle();
+    updateDifficulty();
+    if (cur_style == "script") {
+        $.each( lines, function(i,line) {
+                var cur = [];
+                var sub_c = 0;
+                var words = line.split(" ");
+                $.each( words, function(i,word) {
+                    if (/\S/.test(word)) {
+                        cur.push(word);
+                        if (mapFilter(wordStrokes(word), cur_difficulty_transform)) {
+                            sub_c++;
+                        }
+                    }
+                    });
+                if (cur.length > 0) data.push({index: c, words: cur});
+                c += sub_c;
+                });
+    } else {
+        var count = parseInt($("#randomLength").val());
+        var corpus = [];
+        $.each( lines, function(i,line) {
+                var words = line.split(" ");
+                $.each( words, function(i, rword) {
+                    var word = depunctuateWord(rword);
+                    if (/\S/.test(word) && mapFilter(wordStrokes(word), cur_difficulty_transform)) {
+                        corpus.push(word);
+                    }
+                    });
+                });
+        var cur = [];
+        for (var i = 0; i < count; i++) {
+            if (i % 8 == 0) {
+                cur = [];
+                data.push({index: i, words: cur});
+            }
+            cur.push(corpus[Math.floor(Math.random() * corpus.length)]);
+        }
+    }
+    startData();
+}
+function startData() {
+    cur_line = 0;
+    cur_word = -1;
+    exercise_start = false;
+    samples = [];
+    streak = 0;
+    best_streak = 0;
+    $("#txtInput").removeClass("complete");
+    paintLine();
+}
 function paintLine() {
     var v = $("#viewport");
     cur_elems = [];
     v.html('');
-    $.each(lyrics[cur_line], function (i, word) {
+    $.each(data[cur_line].words, function (i, word) {
             var elem = $("<span>");
             var strokes = wordStrokes(word);
             if (!strokes.length) {
                 elem.addClass("nostroke");
-            } else if (solitaryBrief(word)) {
-                elem.addClass("brief");
             }
             elem.text(word);
             cur_elems.push(elem);
@@ -182,57 +389,43 @@ function nextWord() {
         cur_elems[cur_word].removeClass("partial");
         cur_elems[cur_word].addClass("done");
     }
-    if (cur_word < lyrics[cur_line].length - 1) {
+    if (cur_word < data[cur_line].words.length - 1) {
         cur_word++;
-    } else if (cur_line < lyrics.length - 1) {
+    } else if (cur_line < data.length - 1) {
         cur_word = -1;
         cur_line++;
         return paintLine();
     } else {
         // done
+        $("#txtInput").addClass("complete");
         return;
     }
-    var word = lyrics[cur_line][cur_word];
+    var word = data[cur_line].words[cur_word];
     var strokes = wordStrokes(word);
-    if (!strokes.length || solitaryBrief(word)) {
+    var t_strokes = mapFilter(strokes, cur_difficulty_transform);
+    if (!t_strokes.length) {
         return nextWord();
+    }
+    function strokeCompare(a,b) {
+        return a.split("/").length - b.split("/").length;
+    }
+    function mungeStrokes(strokes) {
+        return uniq(strokes).sort(strokeCompare).join(",");
     }
     currentDrillItem = {
         "Text": word,
-        "Value": uniq(strokes.map(vowelifyStroke)).sort(function(a,b) {return a.split("/").length - b.split("/").length}).join(","),
+        "Value": mungeStrokes(t_strokes),
     }
     cur_elems[cur_word].addClass("current");
-}
-function cleanWord(rword) {
-    return rword.replace(/[!"#$%&\\\(\)*+,-.\/:;<=>?@\[\]\^_`{|}~]/g, "").toLowerCase();
-}
-function wordStrokes(word) {
-    var r = rdata[cleanWord(word)];
-    return r ? r : [];
-}
-function vowelifyStroke(stroke) {
-    var r = [];
-    var parts = stroke.split('/');
-    for (var i = 0; i < parts.length; i++) {
-        var m = parts[i].match(/[AOEU]+/);
-        if (m) {
-            r.push(m[0]);
-        } else {
-            return stroke;
-        }
-    }
-    return r.join('/');
-}
-function bestStroke(strokes) {
-    var cand;
-    $.each(strokes, function(i, s) {
-            cand = take_best(cand, s);
-            });
-    return cand;
+    // TODO: Add other colors which "hint" that the word is funny, e.g. if it is a brief
 }
 
 // ----------------------------------------------------------------------------
 // Utility functions
+
+function mapFilter(xs, f) {
+    return xs.map(f).filter(function(x) {return x});
+}
 
 // Given list a of primitive items, returns it with duplicates removed.
 function uniq(a) {
@@ -266,18 +459,24 @@ function take_best(s1, s2) {
 // Some of this code is pure, some relies on global state.
 // Here are the variable declarations of the global state relied upon:
 
-function showAnswerPrompt() {
+function showAnswerPrompt(steno) {
+    streak = 0;
     var cands = currentDrillItem.
         Value.
         split(",").
-        filter(function(v){return v.indexOf(answerGivenSoFar) == 0});
-    $("#prompt").text(bestStroke(cands));
-} // TODO
+        filter(function(v){return v.indexOf(answerGivenSoFar) == 0}).
+        map(function(v) {return v.substring(answerGivenSoFar.length)});
+    // PROBLEM: want to figure out what LIKELY candidate was
+    addSample(steno, cands);
+    $("#prompt").text(bestStroke(cands) + ", you did " + steno);
+}
 function setStenoKeyboardPressedKeys() {}
 function clearStenoKeyboardPressed() {}
 function hideAnswerPrompt() {}
 function showWpm() {}
 function setNextDrillItem() {
+    streak++;
+    if (streak > best_streak) best_streak = streak;
     nextWord();
 }
 function possibleAnswerClick() {
@@ -333,6 +532,37 @@ function correctAnswer(answer) {
 
     // Not a correct stroke
     return -1;
+}
+
+function getMiddleLettersFromSteno(steno) {
+    var index = steno.indexOf("-");
+
+    if (index >= 0) {
+        // no vowels
+        return "";
+    }
+    var r = "";
+
+    if (steno.indexOf("A") >= 0) {
+        r += "A";
+    }
+
+    if (steno.indexOf("O") >= 0) {
+        r += "O";
+    }
+
+    if (steno.indexOf("*") >= 0) {
+        r += "*";
+    }
+
+    if (steno.indexOf("E") >= 0) {
+        r += "E";
+    }
+
+    if (steno.indexOf("U") >= 0) {
+        r += "U";
+    }
+    return r;
 }
 
 function getLeftLettersFromSteno(steno) {
@@ -756,6 +986,8 @@ function keyUp(event) {
 
                         setNextDrillItem();
 
+                        addSample(steno, [steno]); // XXX NEW XXX
+
                         showDrillItem();
                     }
                     else if (remainingStrokes > 0) {
@@ -770,7 +1002,7 @@ function keyUp(event) {
                     }
                     else {
                         // Incorrect stroke
-                        showAnswerPrompt();
+                        showAnswerPrompt(steno);
                     }
                 }
                 else {
