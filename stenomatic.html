@@ -56,6 +56,7 @@ td {vertical-align: top;}
 <input type="text" id="txtInput">
 <input type="submit" value="&lt;" id="prevbtn">
 <input type="submit" value="&gt;" id="nextbtn">
+<input type="submit" value="Reload" id="loadbtn2">
 </div>
 <div id="barometer"></div>
 <div id="stats"></div>
@@ -118,10 +119,129 @@ You can reduce the difficulty of exercises by practicing only subsets of the Ste
 </table>
 <input type="submit" value="Clear" id="clearbtn">
 <input type="submit" value="Load" id="loadbtn">
+<select id="select-sample"><option value="data">(Preloaded data)</option></select>
         <div><textarea id="data" cols="80" rows="20">
 The quick brown fox jumps over the lazy dog.
 Pack my box with five dozen liquor jugs.
-</textarea></div>
+</textarea>
+<div style="display:none;" id="samples">
+    <textarea id="learnplover-1-left" name="[Learn Plover] 1. One-Syllable Words (Left)">
+    'sap' 'sag' 'sat' 'sass' 'sad' 'sop' 'sob' 'sell' 'set' 'says'
+    'tar' 'tap' 'tab' 'tag' 'tad' 'tour' 'top' 'toll' 'tell' 'tough' 'tub' 'tug'
+    'car' 'cap' 'cab' 'cat' 'cad' 'core' 'cop' 'cog' 'cot' 'cod' 'keg' 'cuff' 'cur' 'cup' 'cub' 'cull' 'cut' 'cuss'
+    'pal' 'pat' 'pass' 'pad' 'pour' 'poll' 'pot' 'pod' 'pep' 'peg' 'pet' 'puff' 'pup' 'pub' 'pull' 'pug' 'put' 'pus'
+    'war' 'wag' 'wad' 'was' 'wore' 'web' 'well' 'wet' 'wed'
+    'half' 'hag' 'hat' 'had' 'has' 'hop' 'hog' 'hot' 'her' 'hell' 'head' 'huff' 'hub' 'hull' 'hug' 'hut'
+    'rap' 'rag' 'rat' 'roar' 'rob' 'roll' 'rot' 'rod' 'red' 'rough' 'rub' 'rug' 'rut'
+    </textarea>
+    <textarea id="learnplover-1-right" name="[Learn Plover] 1. One-Syllable Words (Right)">
+    'half' 'tough' 'cuff' 'puff' 'huff' 'rough'
+    'tar' 'car' 'war' 'tour' 'core' 'pour' 'wore' 'roar' 'her' 'cur' 
+    'sap' 'tap' 'cap' 'rap' 'sop' 'top' 'cop' 'hop' 'pep' 'cup' 'pup'
+    'tab' 'cab' 'sob' 'rob' 'web' 'tub' 'cub' 'pub' 'rub'
+    'pal' 'toll' 'poll' 'roll' 'sell' 'tell' 'well' 'hell' 'cull' 'pull' 'hull'
+    'sag' 'tag' 'wag' 'hag' 'rag' 'cog' 'hog' 'keg' 'peg' 'tug' 'pug' 'hug' 'rug'
+    'sat' 'cat' 'pat' 'hat' 'rat' 'cot' 'pot' 'hot' 'rot' 'set' 'pet' 'wet' 'cut' 'put' 'hut' 'rut'
+    'sass' 'pass' 'cuss' 'pus'
+    'sad' 'tad' 'cad' 'pad' 'wad' 'had' 'cod' 'pod' 'wed' 'head' 'red'
+    'has' 'says' 'was'
+    </textarea>
+    <textarea id="learnplover-3a-1" name="[Learn Plover] 3A-1. The Fifth Vowel Key">
+    'still', 'rig', 'hit', 'sip'
+    'sir', 'skirt'
+    'crypt', 'syrup'
+    'pig' 'rift' 'scribble' 'rid' 'river'
+    'hid' 'wilt' 'wig' 'wit' 'spill'
+    </textarea>
+    <textarea id="learnplover-3a-2" name="[Learn Plover] 3A-2. Long Vowel Chords">
+    'aids' 'ace' 'ate' 'able' 'ape' 'raid' 'raise' 'rail' 'rate' 'pay' 'paid' 'pace' 'tape' 'spray' 'praise'
+    'weaver' 'trees' 'eel' 'eat' 'evil' 'ear' 'heat' 'heap' 'wield' 'weird' 'peer' 'priest' 'tree' 'tweeze' 'tweed' 'seat' 'cease' 'seed' 'seize' 'secrete'
+    'ire' 'I'll' 'ice' 'rife' 'ripe' 'right' 'height' 'wild' 'pipe' 'pride' 'prize' 'kite' 'type' 'spite' 'drive'
+    'hope' 'spore' 'post' 'sold' 'prose' 'ode' 'oat' 'over' 'robe' 'rope' 'roar' 'rove' 'host' 'wove' 'wrote' 'pole' 'pose' 'cope' 'coat' 'code' 'crow' 'told'
+    'cube' 'use' 'rude' 'rule' 'pure' 'prude' 'Proust' 'cure' 'cruel' 'crude' 'cruise' 'truce' 'truth' 'spew' 'skew'
+    </textarea>
+    <textarea id="learnplover-3a-3" name="[Learn Plover] 3A-3. Dipthongs">
+    'all' 'awful' 'raw' 'call' 'caught' 'crawl' 'sprawl' 'scald' 'straw' 'halt' 'hall' 'wall'
+    'out' 'how' 'howl' 'house' 'pout' 'power' 'prowl' 'tower' 'spouse' 'sprout' 'scour'
+    'soy' 'oil' 'coil' 'toil' 'soil'
+    </textarea>
+    <textarea id="learnplover-3a-4" name="[Learn Plover] 3A-4. Vowel Disambiguator Chords">
+    'wheel' 'wheal' 'read' 'reed' 'reel' 'real' 'heel' 'heal' 'hear' 'here' 'ware' 'wear' 'pea' 'pee' 'peace' 'piece' 'tee' 'tea' 'sea' 'see'
+    'tail' 'tale' 'sale' 'sail' 'stare' 'stair' 'waist' 'waste'
+    'hood' 'rude' 'pool' 'crew' 'soot' 'truce' 'school' 'ruse'
+    'road' 'rode' 'roar' 'toad' 'soar' 'sore'
+    </textarea>
+    <textarea id="learnplover-3b" name="[Learn Plover] 3B. The Missing Keys">
+    'due' 'duffer' 'deferral' 'devil' 'double' 'drug' 'depress' 'desire' 'dessert' 'destroyed'
+    'feral' 'ford' 'for' 'phrase' 'fierce' 'fable' 'feeble' 'sphere' 'fries'
+    'leader' 'lace' 'letter' 'lust' 'lovers'
+    'glad' 'glare' 'glides' 'give' 'get' 'group' 'guest' 'guide' 'gravel' 'cigarette' 'goblet'
+    'bored' 'board' 'bruise' 'buyer' 'bobble' 'brutal'
+    'zest' 'zap' 'zag'
+    'vile' 'vase' 'virus'
+    'eke' 'rockets' 'correct' 'quake' 'task'
+    </textarea>
+    <textarea id="learnplover-3c" name="[Learn Plover] 3C. The Remaining Single Letters">
+    'nag' 'nap' 'nab' 'nut' 'never' 'nestle' 'nod' 'nest' 'nerd'
+    'pent' 'parent' 'went' 'earns' 'rant' 'hunt' 'hand' 'panel' 'stun'
+    'must' 'muffle' 'maggot' 'mallet' 'smuggle' 'morals'
+    'arm' 'rum' 'harm' 'tempt' 'term'
+    'calmed' 'palm' 'qualms'
+    'jut' 'jug' 'just' 'jest' 'jets' 'job' 'jostle' 'jazz' 'jagged'
+    'urge' 'edge' 'average' 'purge' 'trudge' 'storage'
+    'yard' 'yet' 'yacht' 'yurt'
+    </textarea>
+    <textarea id="learnplover-3c-cumulative" name="[Learn Plover] 3C. Including Sounds From Previous Lessons">
+    'noun' 'inhibit' 'nudge' 'notes' 'knack' 'enacts' 'neck' 'known' 'knock' 'gnome' 'noise' 'novice' 'named' 'neural' 'snide' 'announce'
+    'loin' 'donor' 'winner' 'dinner' 'learned' 'lend' 'allowance' 'flaunt' 'deference' 'different' 'dance' 'diner' 'demand' 'grunt' 'grant' 'gleans' 'severance' 'cement' 'design'
+    'mound' 'mourn' 'maim' 'matter' 'commit' 'commend' 'smudge' 'smuggle' 'semester'
+    'forms' 'primed' 'serum' 'time' 'hermit' 'maim' 'plumb' 'dream' 'gym' 'germ' 'jam' 'blame' 'bottom' 'grammar'
+    'balm' 'psalm'
+    'judge' 'journal' 'join' 'joyful' 'jam' 'gerunds'
+    'forge' 'budgets' 'average' 'leverage' 'merge' 'beige' 'carriage' 'fidget' 'frigid' 'digit' 'gadget' 'garage' 'grudge' 'turgid'
+    'year' 'yearn' 'yolk'
+    </textarea>
+    <textarea id="learnplover-3d" name="[Learn Plover] 3D. Digraphs">
+    'thefts' 'thud' 'thus' 'thug'
+    'hath' 'earth' 'oath' 'health' 'wealth' 'worth' 'path' 'troth'
+    'chess' 'chest' 'chart' 'chat' 'chop' 'chore' 'chaff'
+    'touch' 'etch' 'ratchet' 'hutch' 'hatch' 'watch' 'patch' 'catch' 'crutch' 'such' 'sketch' 'stretch' 'retch'
+    'shell' 'shuffled' 'shall' 
+    'ash' 'rush' 'rash' 'hush' 'hash' 'wash' 'push' 'posh' 'crush' 'crash' 'trash' 'squash' 'stash'
+    'anger' 'storing' 'rung' 'rang' 'prong' 'tongue' 'twang' 'song' 'stung' 'strong'
+    'sponge' 'orange' 
+    </textarea>
+    <textarea id="learnplover-3d-cumulative" name="[Learn Plover] 3D. Including Sounds From Previous Lessons">
+    'thing' 'thence' 'them' 'thumb' 'thrill' 'throng' 'thrash'
+    'seethe' 'method' 'math' 'birth' 'breath' 'fifth' 'death' 'sleuth' 'blithe' 'growth'
+    'choose' 'chasm' 'chuck' 'check' 'churn' 'cherub' 'chin' 'channel' 'chant' 'chance' 'chive' 'charm'
+    'bleach' 'much' 'latch' 'leech' 'match' 'botch' 'fetch' 'ditch' 'glitch' 'vouch' 'slouch' 'smooch' 'splotch'
+    'shim' 'slime' 'shrewd' 'shrine' 'shuck' 'shark' 'shock' 'sheesh' 'shrivel' 'sugar'
+    'lash' 'mesh' 'mash' 'plush' 'bush' 'brush' 'fish' 'fresh' 'flush' 'flesh' 'flash' 'dash' 'delish' 'gosh' 'gash' 'shush' 'slash' 'smush' 'slosh' 'splash' 'squish' 'Irish'
+    'anger' 'finger' 'dung' 'lung' 'ping' 'pong' 'among' 'bring' 'young' 'fang' 'flung' 'gang' 'belong'
+    'change' 'range' 'hinge' 'lounge' 'plunge' 'cringe' 'tinge' 'fringe' 'derange' 'grunge' 'syringe'
+    </textarea>
+    <textarea id="learnplover-3e" name="[Learn Plover] 3E. Common Compound Clusters">
+    'hemp' 'trump' 'rump' 'romp' 'ramp' 'pump' 'camp' 'cramp' 'tamp' 'pomp'
+    'curve' 'carve' 'serve' 'swerve' 'starve' 
+    'squelch'
+    'hulk' 'calc' 'sulk' 'talc'
+    'rank' 'honk' 'wonk' 'prank' 'crank' 'tank'
+    'session' 'option' 'ration' 'portion' 'passion' 'cushion' 'caption' 'suppression'
+    'section' 'correction' 'suction'
+    'arch' 'ranch' 'hunch' 'porch' 'crunch' 'quench' 'torch' 'trench' 'stench' 'starch' 
+    </textarea>
+    <textarea id="learnplover-3e-cumulative" name="[Learn Plover] 3E. Including Sounds From Previous Lessons">
+    'limp' 'blimp' 'chomp' 'clamp' 'damp' 'slump' 'shrimp' 'jump'
+    'nerve' 'verve' 'marvel'
+    'village' 'mulch' 'bulge' 'belch' 'bilge' 'gulch' 'pillage'
+    'ilk' 'milk' 'bulk' 'silk' 'bilk'
+    'wink' 'mink' 'plank' 'brink' 'blink' 'blank' 'flank' 'flunk' 'dank' 'drink' 'gunk' 'junk' 'link' 'chunk'
+    'lesion' 'provision' 'fusion' 'lotion' 'operation' 'mission' 'motion' 'pollution'
+    'election' 'auction' 'correction' 'collection' 'fraction' 'friction' 'depiction' 'selection' 'seduction'
+    'finch' 'clench' 'branch' 'march' 'lurch' 'lynch' 'birch' 'brunch' 'church' 'drench'
+    </textarea>
+</div></div>
 <script>
 // ----------------------------------------------------------------------------
 // Dictionary initialization
@@ -228,8 +348,16 @@ function addSample(actual, expecteds) {
 }
 
 function init() {
+    $("textarea", "#samples").each(function() {
+            $("#select-sample").append($("<option>").prop("value", $(this).prop("id")).text($(this).prop("name")));
+            });
+    $("#select-sample").change(function(e) {
+            var t = $(document.getElementById($("#select-sample").val()));
+            $("#data").val(t.val());
+            });
     $("#txtInput").val(""); // force empty
     $("#loadbtn").click(loadData);
+    $("#loadbtn2").click(loadData);
     $("#clearbtn").click(function() {$("#data").val("")});
     $("#txtInput").keyup(keyUp).keydown(keyDown);
     $("#prevbtn").click(function() {
@@ -328,7 +456,7 @@ function loadData() {
             cur.push(copyExerciseWord(corpus[Math.floor(Math.random() * corpus.length)]));
         }
     }
-    startData();
+    if (data.length) startData();
 }
 function startData() {
     cur_line = 0;
@@ -337,6 +465,7 @@ function startData() {
     samples = [];
     streak = 0;
     best_streak = 0;
+    misstrokes = 0;
     $("#txtInput").removeClass("complete");
     $("#txtInput").prop("disabled", false);
     $("#prevbtn").prop("disabled", false);
