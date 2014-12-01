@@ -42,10 +42,12 @@ Bugs:
 .done {color: grey !important;}
 .current {background:#DDD}
 .complete {background:#9F9}
+.incorrect {color: #F99 !important;}
 #chkPlainTextInput {display: none}
 .boxLabel {margin-right:1em;}
 h2 {font-size:1.2em;}
 td {vertical-align: top;}
+.many {margin-left:2em;text-indent:-2em;}
 </style>
 </head>
 <body>
@@ -56,6 +58,7 @@ td {vertical-align: top;}
 <input type="submit" value="&gt;" id="nextbtn">
 </div>
 <div id="barometer"></div>
+<div id="stats"></div>
 <span id="prompt"></span>
 <input type="checkbox" id="chkPlainTextInput">
 <hr>
@@ -69,8 +72,8 @@ td {vertical-align: top;}
         <td><strong class="boxLabel">Accuracy</strong> If you misstroke, the stroke is rejected; you cannot move on until you get the stroke right.</td>
     </tr>
     <tr>
-        <td><input type="radio" name="mode" value="speed" onclick="updateMode()" disabled></td>
-        <td><strong class="boxLabel">Speed</strong> If you misstroke a word, you'll move onto the next one.  (Not implemented)</td>
+        <td><input type="radio" name="mode" value="speed" onclick="updateMode()"></td>
+        <td><strong class="boxLabel">Speed</strong> If you misstroke a word, you'll move onto the next one.</td>
     </tr>
 </table>
 <h2>Style:</h2>
@@ -176,14 +179,16 @@ function filterDifficulty(stroke) {
 
 // ----------------------------------------------------------------------------
 // Main user interface
+// data is a list of {index: wordcount index, words: list of {word: word}}
 var data, cur_line, cur_word;
-var cur_elems;
 var currentStroke = 1;
 var cur_mode, cur_style;
 var samples; // {time: Date, start_time: Date, expected_strokes: [String], actual_stroke: String, line: Number, word: Number}
 var stroke_start, exercise_start;
 var streak = 0;
 var best_streak = 0;
+var misstrokes = 0;
+var finished = false;
 
 function updateMode() {
     cur_mode = $('input[name=mode]:checked', '#modebtns').val();
@@ -206,7 +211,7 @@ function updateBarometer() {
     // ToDo: WPM is not really right, but doing it this way
     // so that the easier difficulty modes are not completely
     // bogus
-    $('#barometer').html((cur_line + 1) + "/" + data.length + " <strong>WPM:</strong> " + wpm + ", <strong>Streak:</strong> " + streak + " (best: " + best_streak + ")");
+    $('#barometer').html("[" + (cur_line + 1) + "/" + data.length + "] <strong>WPM:</strong> " + wpm + ", <strong>Streak:</strong> " + streak + " (best: " + best_streak + "), <strong>Misstrokes:</strong> " + misstrokes);
 }
 
 // hmm, I don't know what to actually do with this data
@@ -230,15 +235,23 @@ function init() {
     $("#prevbtn").click(function() {
             if (cur_line == 0) {
                 cur_word = -1;
+                $.each(data[cur_line].words, function(j,word_entry) {
+                        word_entry.status = S_PENDING;
+                    });
                 paintLine();
+                nextWord();
                 return;
             }
             var i = 1;
             var old_cur_line = cur_line;
             while (cur_line >= old_cur_line && cur_line - i >= 0) {
                 cur_line -= i;
+                $.each(data[cur_line].words, function(j,word_entry) {
+                        word_entry.status = S_PENDING;
+                    });
                 cur_word = -1;
                 paintLine();
+                nextWord();
                 i++;
             }
         });
@@ -247,9 +260,26 @@ function init() {
         cur_line++;
         cur_word = -1;
         paintLine();
+        nextWord();
         });
     loadData();
     updateMode();
+}
+var S_PENDING = 0;
+var S_INCORRECT = 1;
+var S_DONE = 2;
+function copyExerciseWord(word_entry) {
+    return {word: word_entry.word,
+        strokes: word_entry.strokes,
+        recognized: word_entry.recognized,
+        status: word_entry.status
+    }
+}
+function mkExerciseWord(word, strokes, recognized) {
+    return {word: word,
+        strokes: strokes,
+        recognized: recognized,
+        status: S_PENDING};
 }
 function loadData() {
     data = [];
@@ -265,10 +295,12 @@ function loadData() {
                 var words = line.split(" ");
                 $.each( words, function(i,word) {
                     if (/\S/.test(word)) {
-                        cur.push(word);
-                        if (mapFilter(wordStrokes(word), filterDifficulty)) {
+                        var strokes = wordStrokes(word);
+                        var t_strokes = mapFilter(strokes, filterDifficulty);
+                        if (t_strokes) {
                             sub_c++;
                         }
+                        cur.push(mkExerciseWord(word, t_strokes, !!strokes.length));
                     }
                     });
                 if (cur.length > 0) data.push({index: c, words: cur});
@@ -281,8 +313,9 @@ function loadData() {
                 var words = line.split(" ");
                 $.each( words, function(i, rword) {
                     var word = depunctuateWord(rword);
-                    if (/\S/.test(word) && mapFilter(wordStrokes(word), filterDifficulty)) {
-                        corpus.push(word);
+                    var t_strokes = mapFilter(wordStrokes(word), filterDifficulty);
+                    if (/\S/.test(word) && t_strokes) {
+                        corpus.push(mkExerciseWord(word, t_strokes, true));
                     }
                     });
                 });
@@ -292,7 +325,7 @@ function loadData() {
                 cur = [];
                 data.push({index: i, words: cur});
             }
-            cur.push(corpus[Math.floor(Math.random() * corpus.length)]);
+            cur.push(copyExerciseWord(corpus[Math.floor(Math.random() * corpus.length)]));
         }
     }
     startData();
@@ -305,51 +338,104 @@ function startData() {
     streak = 0;
     best_streak = 0;
     $("#txtInput").removeClass("complete");
+    $("#txtInput").prop("disabled", false);
+    $("#prevbtn").prop("disabled", false);
+    $("#nextbtn").prop("disabled", false);
+    finished = false;
+    $('#stats').html("");
     $('#barometer').html("");
     paintLine();
+    nextWord();
 }
 function paintLine() {
     var v = $("#viewport");
-    cur_elems = [];
     v.html('');
-    $.each(data[cur_line].words, function (i, word) {
-            var elem = $("<span>");
-            var strokes = wordStrokes(word);
-            var t_strokes = mapFilter(strokes, filterDifficulty);
-            if (!strokes.length) {
-                elem.addClass("nostroke");
-            } else if (!t_strokes.length) {
-                elem.addClass("done");
-            }
+    $.each(data[cur_line].words, function (i, word_entry) {
+            var word = word_entry.word;
+            var elem = word_entry.elem ? word_entry.elem : $("<span>");
+            word_entry.elem = elem;
             elem.text(word);
-            cur_elems.push(elem);
+            paintWord(word_entry);
             v.append(elem);
             v.append(document.createTextNode(" "));
     });
-    nextWord();
 }
-function nextWord() {
+function prevWord() {
+    var repaint_line = false;
+    var first = true;
+    while (cur_line >= 0 || cur_word >= 0) {
+        var word_entry = data[cur_line].words[cur_word];
+        word_entry.status = S_PENDING;
+        paintWord(word_entry);
+        if (!first && word_entry.recognized && word_entry.strokes.length) break;
+        if (cur_line == 0 && cur_word == 0) break;
+        if (cur_word == 0) {
+            repaint_line = true;
+            cur_line--;
+            cur_word = data[cur_line].words.length - 1;
+        } else {
+            cur_word--;
+        }
+        var first = false;
+    }
+    if (repaint_line) {
+        paintLine();
+    }
+    setupWord();
+}
+function nextWord(misstroke) {
     currentStroke = 1;
     answerGivenSoFar = "";
     $("#txtInput").val("");
     $("#prompt").text("");
     if (cur_word >= 0) {
-        cur_elems[cur_word].removeClass("current");
-        cur_elems[cur_word].removeClass("partial");
-        cur_elems[cur_word].addClass("done");
+        var word_entry = data[cur_line].words[cur_word];
+        if (misstroke) {
+            word_entry.status = S_INCORRECT;
+        } else {
+            word_entry.status = S_DONE;
+        }
+        paintWord(word_entry);
     }
     if (cur_word < data[cur_line].words.length - 1) {
         cur_word++;
     } else if (cur_line < data.length - 1) {
         cur_word = -1;
         cur_line++;
-        return paintLine();
+        paintLine();
+        return nextWord();
     } else {
         // done
         $("#txtInput").addClass("complete");
+        $("#txtInput").prop("disabled", true);
+        $("#prevbtn").prop("disabled", true);
+        $("#nextbtn").prop("disabled", true);
+        finished = true;
+        // run some quick stats
+        var errors = 0;
+        var error_list = [];
+        var v = $("#viewport");
+        v.html("");
+        $.each(data, function(i,line) {
+                var d = $("<div class='many'>");
+                $.each(line.words, function(j,word) {
+                    d.append(word.elem);
+                    d.append(document.createTextNode(" "));
+                    if (word.status == S_INCORRECT) {
+                        errors++;
+                    }
+                    });
+                v.append(d);
+                });
+        $("#stats").html("<strong>Uncorrected errors:</strong> " + errors);
         return;
     }
-    var word = data[cur_line].words[cur_word];
+    setupWord();
+}
+
+function setupWord() {
+    var word_entry = data[cur_line].words[cur_word];
+    var word = word_entry.word;
     var strokes = wordStrokes(word);
     var t_strokes = mapFilter(strokes, filterDifficulty);
     if (!t_strokes.length) {
@@ -365,7 +451,20 @@ function nextWord() {
         "Text": word,
         "Value": mungeStrokes(t_strokes),
     }
-    cur_elems[cur_word].addClass("current");
+    paintWord(word_entry);
+    word_entry.elem.addClass("current");
+}
+
+function paintWord(word_entry) {
+    var elem = word_entry.elem;
+    elem.removeClass();
+    if (!word_entry.recognized) {
+        elem.addClass("nostroke");
+    } else if (word_entry.status == S_DONE) {
+        elem.addClass("done");
+    } else if (word_entry.status == S_INCORRECT) {
+        elem.addClass("incorrect");
+    }
     // TODO: Add other colors which "hint" that the word is funny, e.g. if it is a brief
 }
 
@@ -411,6 +510,7 @@ function take_best(s1, s2) {
 
 function showAnswerPrompt(steno) {
     streak = 0;
+    misstrokes++;
     var cands = currentDrillItem.
         Value.
         split(",").
@@ -418,6 +518,9 @@ function showAnswerPrompt(steno) {
         map(function(v) {return v.substring(answerGivenSoFar.length)});
     // PROBLEM: want to figure out what LIKELY candidate was
     addSample(steno, cands);
+    if (cur_mode == "speed") {
+        nextWord(true);
+    }
     $("#prompt").text(bestStroke(cands) + ", you did " + steno);
 }
 function setStenoKeyboardPressedKeys() {}
@@ -976,6 +1079,10 @@ function keyUp(event) {
                         jQuery('#txtInput').val(answerGivenSoFar);
 
                         possibleAnswerClick(currentTdAnswer + 1);
+                    } else {
+                        if (cur_mode == "speed") {
+                            prevWord(); // XXX NEW XXX
+                        }
                     }
                 }
             }

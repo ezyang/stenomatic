@@ -240,20 +240,33 @@ $(document).ready(function() {
   // Only load the dictionary with AJAX if it was not loaded through a script
   // include. Script include would be used locally for offline use, since Chrome
   // won't get file:// URLs with AJAX.
-  $.getJSON('assets/dict.json', function (dictionary) {
+  $.getJSON('dict.json', function (dictionary) {
     Steno.dictionary = dictionary;
     buildReverseLookup(Steno.dictionary);
   });
 });
 
 // Called after the dictionary is loaded, to build reverse lookup.
+// We're building a TRIE.
+// This is a CPU HOG, locks up my computer for something like eight seconds
+// before completing.  We can't cache the reverse lookup table easily
+// because it's circular.  I haven't tried compressing it (haha trie(d))
+// which might reduce allocation pressure, although splitting nodes
+// could be painful.  Use a drop in JS Trie implementation.
 function buildReverseLookup(dictionary) {
   // Append this continuation to the paths
+  // root is the subtrie we're adding the lookup to
+  // path is the translated text key for the trie
+  // continuation is the subtrie to attach to the end of this path
+  // stroke is the untranslated stroke
   function append(root, path, continuation, stroke) {
+    // Recursively generate the trie for path
     for(var i = 0; i < path.length; i++) {
       root = root[path[i]] = root[path[i]] || {};
     }
+    // Use the $ to represent path end
     var list = root['$'] = root['$'] || [];
+    // insert the new stroke in sorted form onto the strokes list
     for(var i = 0; i < list.length; i++) {
       if(list[i].continuation === continuation) {
         var index = list[i].strokes.binarySearch(stroke);
@@ -1155,15 +1168,9 @@ function startEngine() {
   });
   $('#settings').click(function() {
     $('#settingsPanel').toggleClass('show');
-    $('#helpPanel').removeClass('show');
-  });
-  $('#help').click(function() {
-    $('#helpPanel').toggleClass('show');
-    $('#settingsPanel').removeClass('show');
   });
   $('.close').click(function() {
     $('#settingsPanel').removeClass('show');
-    $('#helpPanel').removeClass('show');
   });
   $('#graphing').click(function() {
     $('#graph').toggleClass('show');
@@ -1295,10 +1302,6 @@ body {
   line-height: 1.4em;
   margin-bottom: 1em;
 }
-canvas.show + #output {
-  margin-top: 100px;
-  min-height: 408px;
-}
 div > span {
   border-bottom: 2px solid transparent;
 }
@@ -1402,9 +1405,6 @@ div.retract span.retracted {
 #settingsPanel {
   white-space: nowrap;
 }
-#helpPanel {
-  width: 520px;
-}
 div.show {
   display: block;
 }
@@ -1425,7 +1425,6 @@ span.settingsSource {
 }
 </style>
 </head><body>
-  <canvas id="graph" width="516" height="100"></canvas>
   <div id="output" class="raw correct">Loading dictionary...</div>
   <span class="settingsSource">
     <div class="settings" id="settingsPanel">
@@ -1442,41 +1441,12 @@ span.settingsSource {
       <br><br>
       <input type="checkbox" id="warn"><label for="warn">Warn on leaving page</label>
     </div>
-    <div class="settings" id="helpPanel">
-One way to use this: Transcribe normally, and watch for improved strokes
-to be suggested. Suggestions are shown if a word can be stroked with fewer
-strokes than you used. You can hover a suggestion to see other options.
-<br><br>
-If you can't figure out how to stroke a word, fingerspell it or tab over to the
-keyboard input field and type it normally. A suggested stroke will be shown.
-<br><br>
-Turn off suggestions for clean text to copy and paste into another program.
-<br><br>
-Another way to use this: Type up a full passage, then review. Turn on
-the WPM graph and hover over a slow section to see what you struggled with. Or,
-turn on display of retractions and see where you made several tries at a word.
-You can also hover the mouse over a word to see how you stroked it.
-<br><br>
-A third option: Paste a passage into the keyboard input field. It will be
-annotated with how to stroke it. Type those strokes to reproduce the passage.
-This can be helpful when first learning.
-<br><br>
-Settings allow you to change the stroke display mode for easier reading. You can
-also tell the program what keyboard layout you use so that steno strokes will be
-properly recognized. Finally, you can turn on a warning so that you won't
-accidentally leave the page before copying out the text you have typed.
-<br><br>
-If you would like to use this program offline, you can <a href="assets/stenoLearner.zip">download it here</a>.
-      <input class="close" type="button" value="X">
-    </div>
   </span>
   <input type="button" id="settings" value="Settings...">
   &nbsp;&nbsp;&nbsp;&nbsp;
   <input type="checkbox" id="corrections" checked="true"><label for="corrections">Suggestions</label>
   <input type="checkbox" id="retractions"><label for="retractions">Retractions</label>
   <input type="checkbox" id="graphing"><label for="graphing">Graph</label>
-  &nbsp;&nbsp;&nbsp;&nbsp;
-  <input type="button" id="help" value="?">
   <br/>
   Time: <span id="time">0:00</span>
   &nbsp;&nbsp;&nbsp;&nbsp;
