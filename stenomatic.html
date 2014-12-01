@@ -2,9 +2,6 @@
 
 Things I know how to implement:
 
-    * Generate a heat map of words you got wrong from the
-      transcript.
-
     * Generate a heat map of how long it took to do the words
 
     * If we can guess what the "right" stroke which was supposed
@@ -36,18 +33,28 @@ Bugs:
 <link rel="prefetch" href="dict.json">
 <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
 <style>
+html {overflow-y: scroll;}
 #viewport { font-size: 2em; }
 .brief {color: blue;}
 .nostroke {color: purple;}
-.done {color: grey !important;}
+.done {color: grey;}
 .current {background:#DDD}
 .complete {background:#9F9}
-.incorrect {color: #F99 !important;}
+.incorrect {color: #F99;}
 #chkPlainTextInput {display: none}
 .boxLabel {margin-right:1em;}
 h2 {font-size:1.2em;}
 td {vertical-align: top;}
 .many {margin-left:2em;text-indent:-2em;}
+.many .done {color: #000}
+.many .incorrect {color: #EEE; background:#600;}
+.over {font-size:2em; padding:0;}
+.under {cursor: pointer; font-size:0.8em; padding:0;padding-top:-0.4em;padding-bottom:0.4em;font-family:Arial;}
+.under .diff sub {color:red;}
+.under .diff sup {color:green;}
+.under .errorCount {color:red;}
+.unit {display:inline;text-align:center; border-collapse: collapse; border-spacing: 0;}
+.wordstat {}
 </style>
 </head>
 <body>
@@ -56,7 +63,7 @@ td {vertical-align: top;}
 <input type="text" id="txtInput">
 <input type="submit" value="&lt;" id="prevbtn">
 <input type="submit" value="&gt;" id="nextbtn">
-<input type="submit" value="Reload" id="loadbtn2">
+<input type="submit" value="Restart" id="loadbtn2">
 </div>
 <div id="barometer"></div>
 <div id="stats"></div>
@@ -70,11 +77,11 @@ td {vertical-align: top;}
 <table id="modebtns">
     <tr>
         <td><input type="radio" name="mode" value="accuracy" onclick="updateMode()" checked></td>
-        <td><strong class="boxLabel">Accuracy</strong> If you misstroke, the stroke is rejected; you cannot move on until you get the stroke right.</td>
+        <td><strong class="boxLabel">Require correct stroke</strong> If you misstroke, the stroke is rejected; you cannot move on until you get the stroke right.  When you are done, you will see how long it took for you to stroke a word, as well as how many misstrokes were made before the word was finished.</td>
     </tr>
     <tr>
         <td><input type="radio" name="mode" value="speed" onclick="updateMode()"></td>
-        <td><strong class="boxLabel">Speed</strong> If you misstroke a word, you'll move onto the next one.</td>
+        <td><strong class="boxLabel">Advance on misstroke</strong> If you misstroke a word, you'll move onto the next one.  You can go back and fix your error with the asterisk.  When you are done, you will be shown all of your misstrokes and a suggested correction for them.  Try using this mode with a metronome!</td>
     </tr>
 </table>
 <h2>Style:</h2>
@@ -97,8 +104,13 @@ You can reduce the difficulty of exercises by practicing only subsets of the Ste
         </td>
     </tr>
     <tr>
-        <td><input type="checkbox" id="enable-vowels" value="vowel" checked></td>
-        <td><strong class="boxLabel">Vowel keys</strong> (AOEU)
+        <td><input type="checkbox" id="enable-left-vowels" value="vowel" checked></td>
+        <td><strong class="boxLabel">Left vowel keys</strong> (AO)
+        </td>
+    </tr>
+    <tr>
+        <td><input type="checkbox" id="enable-right-vowels" value="vowel" checked></td>
+        <td><strong class="boxLabel">Right vowel keys</strong> (EU)
         </td>
     </tr>
     <tr>
@@ -283,7 +295,15 @@ function filterDifficulty(stroke) {
         if (!$("#enable-asterisk").prop("checked") && strokes[i].indexOf("*") != -1) return false;
         var leftLetters = "", rightLetters = "", middleLetters = "";
         if ($("#enable-left").prop("checked")) { leftLetters = getLeftLettersFromSteno(strokes[i]); }
-        if ($("#enable-vowels").prop("checked")) { middleLetters = getMiddleLettersFromSteno(strokes[i]); }
+        if ($("#enable-left-vowels").prop("checked") || $("#enable-right-vowels").prop("checked") ) {
+            middleLetters = getMiddleLettersFromSteno(strokes[i]);
+            if (!$("#enable-left-vowels").prop("checked") && middleLetters.match(/[AO]/)) {
+                return false;
+            }
+            if (!$("#enable-right-vowels").prop("checked") && middleLetters.match(/[EU]/)) {
+                return false;
+            }
+        }
         if ($("#enable-right").prop("checked")) { rightLetters = getRightLettersFromSteno(strokes[i]); }
         if (middleLetters.length == 0 && rightLetters.length > 0) { middleLetters = "-"; }
         r.push(leftLetters + middleLetters + rightLetters);
@@ -400,6 +420,7 @@ function copyExerciseWord(word_entry) {
     return {word: word_entry.word,
         strokes: word_entry.strokes,
         recognized: word_entry.recognized,
+        user: word_entry.user.slice(0),
         status: word_entry.status
     }
 }
@@ -407,7 +428,11 @@ function mkExerciseWord(word, strokes, recognized) {
     return {word: word,
         strokes: strokes,
         recognized: recognized,
+        user: [], // what you stroked in
         status: S_PENDING};
+}
+function getCurrentWord() {
+    return data[cur_line].words[cur_word];
 }
 function loadData() {
     data = [];
@@ -442,7 +467,7 @@ function loadData() {
                 $.each( words, function(i, rword) {
                     var word = depunctuateWord(rword);
                     var t_strokes = mapFilter(wordStrokes(word), filterDifficulty);
-                    if (/\S/.test(word) && t_strokes) {
+                    if (/\S/.test(word) && t_strokes.length) {
                         corpus.push(mkExerciseWord(word, t_strokes, true));
                     }
                     });
@@ -466,6 +491,7 @@ function startData() {
     streak = 0;
     best_streak = 0;
     misstrokes = 0;
+    stroke_start = false;
     $("#txtInput").removeClass("complete");
     $("#txtInput").prop("disabled", false);
     $("#prevbtn").prop("disabled", false);
@@ -493,7 +519,7 @@ function prevWord() {
     var repaint_line = false;
     var first = true;
     while (cur_line >= 0 || cur_word >= 0) {
-        var word_entry = data[cur_line].words[cur_word];
+        var word_entry = getCurrentWord();
         word_entry.status = S_PENDING;
         paintWord(word_entry);
         if (!first && word_entry.recognized && word_entry.strokes.length) break;
@@ -518,7 +544,7 @@ function nextWord(misstroke) {
     $("#txtInput").val("");
     $("#prompt").text("");
     if (cur_word >= 0) {
-        var word_entry = data[cur_line].words[cur_word];
+        var word_entry = getCurrentWord();
         if (misstroke) {
             word_entry.status = S_INCORRECT;
         } else {
@@ -535,35 +561,89 @@ function nextWord(misstroke) {
         return nextWord();
     } else {
         // done
-        $("#txtInput").addClass("complete");
-        $("#txtInput").prop("disabled", true);
-        $("#prevbtn").prop("disabled", true);
-        $("#nextbtn").prop("disabled", true);
-        finished = true;
-        // run some quick stats
-        var errors = 0;
-        var error_list = [];
-        var v = $("#viewport");
-        v.html("");
-        $.each(data, function(i,line) {
-                var d = $("<div class='many'>");
-                $.each(line.words, function(j,word) {
-                    d.append(word.elem);
-                    d.append(document.createTextNode(" "));
-                    if (word.status == S_INCORRECT) {
-                        errors++;
-                    }
-                    });
-                v.append(d);
-                });
-        $("#stats").html("<strong>Uncorrected errors:</strong> " + errors);
+        finishExercise();
         return;
     }
     setupWord();
 }
 
+String.prototype.contains = function(it) { return this.indexOf(it) != -1; };
+
+function diffSteno(actual, expected) {
+    if (!actual) { // success we don't record
+        return expected;
+    }
+    var actual_left = getLeftLettersFromSteno(actual);
+    var expected_left = getLeftLettersFromSteno(expected);
+    var actual_middle = getMiddleLettersFromSteno(actual);
+    var expected_middle = getMiddleLettersFromSteno(expected);
+    var actual_right = getRightLettersFromSteno(actual);
+    var expected_right = getRightLettersFromSteno(expected);
+    var r = "";
+    function handler(a, e) {
+        return function(i,l) {
+            if (a.contains(l) && e.contains(l)) {
+                r += l;
+            } else if (!a.contains(l) && !e.contains(l)) {
+            } else if (a.contains(l) && !e.contains(l)) {
+                r += "<sub>" + l + "</sub>";
+            } else if (!a.contains(l) && e.contains(l)) {
+                r += "<sup>" + l + "</sup>";
+            }
+        }
+    }
+    $.each(["S","T","K","P","W","H","R"], handler(actual_left, expected_left));
+    $.each(["A", "O", "*", "E", "U"], handler(actual_middle, expected_middle));
+    $.each(["F","R","P","B","L","G","T","S","D","Z"], handler(actual_right, expected_right));
+    return $("<span>").addClass("diff").html(r);
+}
+
+function finishExercise() {
+    $("#txtInput").addClass("complete");
+    $("#txtInput").prop("disabled", true);
+    $("#prevbtn").prop("disabled", true);
+    $("#nextbtn").prop("disabled", true);
+    finished = true;
+    // run some quick stats
+    var errors = 0;
+    var error_list = [];
+    var v = $("#viewport");
+    v.html("");
+    $.each(data, function(i,line) {
+            var d = $("<div class='many'>");
+            $.each(line.words, function(j,word) {
+                var cell = $("<table class='unit'>");
+                cell.append($("<tr>").html($("<td class='over'>").html(word.elem)));
+                var annot = "";
+                if (!word.recognized) {
+                } else if (cur_mode == "speed") {
+                    annot = diffSteno(word.user[word.user.length-1], bestStroke(word.strokes));
+                    annot.prop("title", word.user.join(", "));
+                } else if (cur_mode == "accuracy") {
+                    // TODO: color code for victory
+                    // two significant digits at all times
+                    var time = word.time >= 1000 ? (Math.round(word.time / 100) / 10)
+                                                 : (Math.round(word.time / 10) / 100);
+                    annot += time;
+                    if (word.user.length > 1) {
+                        annot += "<sup class='errorCount'>(" + (word.user.length - 1) + ")</sup>"
+                    }
+                    annot = $("<span class='wordstat'>").prop("title", word.user.join(", ")).html(annot);
+                }
+                cell.append($("<tr>").html($("<td class='under'>").html(annot)));
+                d.append(cell);
+                d.append(document.createTextNode(" "));
+                if (word.status == S_INCORRECT) {
+                    errors++;
+                }
+                });
+            v.append(d);
+            });
+    $("#stats").html("<strong>Uncorrected errors:</strong> " + errors);
+}
+
 function setupWord() {
-    var word_entry = data[cur_line].words[cur_word];
+    var word_entry = getCurrentWord();
     var word = word_entry.word;
     var strokes = wordStrokes(word);
     var t_strokes = mapFilter(strokes, filterDifficulty);
@@ -582,6 +662,9 @@ function setupWord() {
     }
     paintWord(word_entry);
     word_entry.elem.addClass("current");
+    if (exercise_start) {
+        stroke_start = new Date();
+    }
 }
 
 function paintWord(word_entry) {
@@ -639,7 +722,14 @@ function take_best(s1, s2) {
 
 function showAnswerPrompt(steno) {
     streak = 0;
+    if (!stroke_start) {
+        // first one's free.
+        stroke_start = new Date();
+        return;
+    }
     misstrokes++;
+    var we = getCurrentWord();
+    we.user.push(steno);
     var cands = currentDrillItem.
         Value.
         split(",").
@@ -656,7 +746,12 @@ function setStenoKeyboardPressedKeys() {}
 function clearStenoKeyboardPressed() {}
 function hideAnswerPrompt() {}
 function showWpm() {}
-function setNextDrillItem() {
+function setNextDrillItem(steno) {
+    addSample(steno, [steno]);
+    var we = getCurrentWord();
+    we.user.push(steno);
+    if (!stroke_start) stroke_start = new Date();
+    we.time = (new Date()).getTime() - stroke_start.getTime();
     streak++;
     if (streak > best_streak) best_streak = streak;
     nextWord();
@@ -1166,9 +1261,7 @@ function keyUp(event) {
 
                         showWpm();
 
-                        setNextDrillItem();
-
-                        addSample(steno, [steno]); // XXX NEW XXX
+                        setNextDrillItem(steno); // XXX NEW XXX
 
                         showDrillItem();
                     }
