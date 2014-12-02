@@ -2,21 +2,71 @@
 
 Things I know how to implement:
 
-    * Generate a heat map of how long it took to do the words
+    * MAXIMIZE CONFUSION.  Right now we have a simple Markov
+      process which avoids similar words; we can furthermore
+      try to force vowel to skip between left and right, force
+      different finger and force contrary motion (one finger goes
+      left while the other goes right; also same motion),
+      using different probability distributions.
 
-    * If we can guess what the "right" stroke which was supposed
-      to be used (reasonable for simplified test sets), we can
-      collect per key and chord statistics (which keys do you get
-      wrong)
+    * Markov generated random text based on the input corpus (Ha Ha)
 
-    * Aggregated data: if you do the same test set multiple times,
-      give some ability to track progress over time.
+    * Smooth scrolling, use
+      http://stackoverflow.com/questions/2905867/how-to-scroll-to-specific-item-using-jquery
+
+    * Swap out http://stenoknight.com/plover/ploverlookup/categorized.json
+      so we don't suggest misstrokes.  Also custom dictionary support.
+
+    * Colorized letters per word types see
+      http://stenoknight.com/plover/ploverdemo/ploverdemo.html
+
+    * Bring back the steno keyboard (toggleable, also how heavy
+      hint should be given should be toggleable), BTW colorize
+      it same as above!
+
+    * Download your data, load it into R and do stats analysis
+      on it. (Is this actually useful?)
 
     * Karaoke mode: take a cue file and do time trials. (Need to
       give user a grace period since the subfiles will not necessarily
       be the right place.) Use YOUTUBE to source music cheaply.
 
     * Time trial mode: karaoke mode but without the karaoke
+      (Low priority, you can simulate this using a metronome).
+
+    * Idea for rendering misstrokes: key heatmap.  Increase color
+      depth if you keep stroking the key instead of the right
+      one (which is highlighted in some way).  Benefit of this
+      scheme: you can aggregate when stroking the same word
+      multiple times.  Maybe more difficult if trying to aggregate
+      per chord; maybe just split left/right/vowel.
+
+Things which will be annoying to implement.
+
+    * Fix stemmification/suffixization.  StenoLearner does this
+      property but I can't stand waiting for its dictionary to
+      load.  Maybe add some ad hoc rules to fix it.
+
+Things which would be nice to implement, but which I don't know
+how to spec.
+
+    * Visual representation of how long it took to do words.  Heat map?
+      Some sort of coloring?  Little bars?  Sizing?  Need to play
+      around with a few options, what we have right now is NOT very good.
+
+    * Per key/chord statistics.  We have a teensy bit of this in
+      the post mortem code, unclear how to package this up in
+      a better format.
+
+    * Aggregated data: if you do the same test set multiple times,
+      give some ability to track progress over time.  Preferably
+      have some sort of server to store tests and your data, but
+      this will be annoying to setup and maintain.
+
+    * I'm pretty sure there is at least some hysterisis going on
+      between previous and next stroke, but I don't know how
+      to visualize this.  Musically it's like "intervals", but
+      there are a lot more intervals.
 
 This is like, a non-gameified version of many of the minigames
 imagined in http://plover.stenoknight.com/2011/04/hover-plover.html
@@ -49,11 +99,11 @@ td {vertical-align: top;}
 .many .done {color: #000}
 .many .incorrect {color: #EEE; background:#600;}
 .over {font-size:2em; padding:0;}
-.under {cursor: pointer; font-size:0.8em; padding:0;padding-top:-0.4em;padding-bottom:0.4em;font-family:Arial;}
+.under {font-size:0.8em; padding:0;padding-top:-0.4em;padding-bottom:0.4em;font-family:Arial;}
 .under .diff sub {color:red;}
 .under .diff sup {color:green;}
 .under .errorCount {color:red;}
-.unit {display:inline;text-align:center; border-collapse: collapse; border-spacing: 0;}
+.unit {cursor: pointer; display:inline;text-align:center; border-collapse: collapse; border-spacing: 0;}
 .wordstat {}
 </style>
 </head>
@@ -92,7 +142,7 @@ td {vertical-align: top;}
     </tr>
     <tr>
         <td><input type="radio" name="style" value="randomized"></td>
-        <td><strong class="boxLabel">Randomized</strong> Generate <input type="text" id="randomLength" value="100" size="1"> random words sampled from the source input (weighted based on occurrence frequency).</td>
+        <td><strong class="boxLabel">Randomized</strong> Generate <input type="text" id="randomLength" value="100" size="1"> random words sampled from the source input (weighted based on occurrence frequency).<br><input type="checkbox" id="randomShift"> Maximize finger movement by preventing similar words from being adjacent.</td>
     </tr>
 </table>
 <h2>Difficulty:</h2>
@@ -253,6 +303,29 @@ Pack my box with five dozen liquor jugs.
     'election' 'auction' 'correction' 'collection' 'fraction' 'friction' 'depiction' 'selection' 'seduction'
     'finch' 'clench' 'branch' 'march' 'lurch' 'lynch' 'birch' 'brunch' 'church' 'drench'
     </textarea>
+    <textarea id="ploverwiki-common" name="[Plover Wiki] Practice Sentences with Common English Words">
+    So is this working? 
+    Take that! 
+    In general, all are found. 
+    Some new, or not, interest him. 
+    Through time, my days made years. 
+    There can be only one. 
+    Most may make many more. 
+    When will you? 
+    If I, like he, were them, our people would now will well. 
+    On such a day, no other said. 
+    The great first country was for her. 
+    Who other than she? 
+    Being between out, over, under, and upon, every good must last. 
+    Where were we? 
+    What has been here before is his. 
+    After all, it is about that which you are from. 
+    What can they have from these today? 
+    By and large, it’s made very well. 
+    Since they were up to it, their will was had. 
+    At its general time, but still while they were here. 
+    Of which one is that? 
+    </textarea>
 </div></div>
 <script>
 // ----------------------------------------------------------------------------
@@ -316,6 +389,17 @@ function filterDifficulty(stroke) {
 }
 // TODO: lift "chordifying" code from https://plover.goeswhere.com/
 // so we can get per-chord stats
+
+// todo: reverse array
+function stenoArray(steno) {
+    var left = getLeftLettersFromSteno(steno);
+    var right = getRightLettersFromSteno(steno);
+    var r = [];
+    $.each(["S","T","K","P","W","H","R"], function(i,l) { r.push(left.contains(l)); });
+    $.each(["A", "O", "*", "E", "U"], function(i,l) { r.push(steno.contains(l)); });
+    $.each(["F","R","P","B","L","G","T","S","D","Z"], function(i,l) { r.push(right.contains(l)); } );
+    return r;
+}
 
 // ----------------------------------------------------------------------------
 // Main user interface
@@ -425,8 +509,11 @@ function copyExerciseWord(word_entry) {
     }
 }
 function mkExerciseWord(word, strokes, recognized) {
+    var best_stroke = bestStroke(strokes);
     return {word: word,
         strokes: strokes,
+        bestStroke: best_stroke,
+        bestStrokeArray: stenoArray(best_stroke),
         recognized: recognized,
         user: [], // what you stroked in
         status: S_PENDING};
@@ -459,7 +546,7 @@ function loadData() {
                 if (cur.length > 0) data.push({index: c, words: cur});
                 c += sub_c;
                 });
-    } else {
+    } else if (cur_style == "randomized") {
         var count = parseInt($("#randomLength").val());
         var corpus = [];
         $.each( lines, function(i,line) {
@@ -472,13 +559,42 @@ function loadData() {
                     }
                     });
                 });
+        // Make me a Markov chain
+        $.each(corpus, function(i1,e1) {
+            if ($("#randomShift").is(':checked')) {
+                var scores = [];
+                $.each(corpus, function(i2,e2) {
+                        // TODO refactor out acceptability function
+                        var score = 0;
+                        for (var k = 0; k < e1.bestStrokeArray.length; k++) {
+                            if (e1.bestStrokeArray[k] == 1 && e2.bestStrokeArray[k] == 1) score++;
+                        }
+                        if (!scores[score]) scores[score] = [];
+                        scores[score].push(e2);
+                    });
+                for (var j = 0; j < scores.length; j++) {
+                    if (scores[j]) {
+                        e1.transitions = scores[j];
+                        break;
+                    }
+                }
+                if (!e1.transitions) {
+                    e1.transitions = corpus;
+                }
+            } else {
+                e1.transitions = corpus;
+            }
+            });
         var cur = [];
+        var transitions = corpus;
         for (var i = 0; i < count; i++) {
             if (i % 8 == 0) {
                 cur = [];
                 data.push({index: i, words: cur});
             }
-            cur.push(copyExerciseWord(corpus[Math.floor(Math.random() * corpus.length)]));
+            var cand = transitions[Math.floor(Math.random() * transitions.length)];
+            cur.push(copyExerciseWord(cand));
+            transitions = cand.transitions;
         }
     }
     if (data.length) startData();
@@ -593,7 +709,9 @@ function diffSteno(actual, expected) {
         }
     }
     $.each(["S","T","K","P","W","H","R"], handler(actual_left, expected_left));
+    var old_r = r;
     $.each(["A", "O", "*", "E", "U"], handler(actual_middle, expected_middle));
+    if (old_r == r) r += "-";
     $.each(["F","R","P","B","L","G","T","S","D","Z"], handler(actual_right, expected_right));
     return $("<span>").addClass("diff").html(r);
 }
@@ -613,12 +731,12 @@ function finishExercise() {
             var d = $("<div class='many'>");
             $.each(line.words, function(j,word) {
                 var cell = $("<table class='unit'>");
+                cell.prop("title", word.user.join(", "))
                 cell.append($("<tr>").html($("<td class='over'>").html(word.elem)));
                 var annot = "";
                 if (!word.recognized) {
                 } else if (cur_mode == "speed") {
                     annot = diffSteno(word.user[word.user.length-1], bestStroke(word.strokes));
-                    annot.prop("title", word.user.join(", "));
                 } else if (cur_mode == "accuracy") {
                     // TODO: color code for victory
                     // two significant digits at all times
@@ -628,7 +746,7 @@ function finishExercise() {
                     if (word.user.length > 1) {
                         annot += "<sup class='errorCount'>(" + (word.user.length - 1) + ")</sup>"
                     }
-                    annot = $("<span class='wordstat'>").prop("title", word.user.join(", ")).html(annot);
+                    annot = $("<span class='wordstat'>").html(annot);
                 }
                 cell.append($("<tr>").html($("<td class='under'>").html(annot)));
                 d.append(cell);
@@ -662,7 +780,7 @@ function setupWord() {
     }
     paintWord(word_entry);
     word_entry.elem.addClass("current");
-    if (exercise_start) {
+    if (cur_line != 0 || cur_word != 0) {
         stroke_start = new Date();
     }
 }
