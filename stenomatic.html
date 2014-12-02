@@ -14,8 +14,7 @@ Things I know how to implement:
     * Smooth scrolling, use
       http://stackoverflow.com/questions/2905867/how-to-scroll-to-specific-item-using-jquery
 
-    * Swap out http://stenoknight.com/plover/ploverlookup/categorized.json
-      so we don't suggest misstrokes.  Also custom dictionary support.
+    * Custom dictionary support.
 
     * Colorized letters per word types see
       http://stenoknight.com/plover/ploverdemo/ploverdemo.html
@@ -61,7 +60,8 @@ how to spec.
     * Aggregated data: if you do the same test set multiple times,
       give some ability to track progress over time.  Preferably
       have some sort of server to store tests and your data, but
-      this will be annoying to setup and maintain.
+      this will be annoying to setup and maintain.  WPMs at bare
+      minimum, also test data.
 
     * I'm pretty sure there is at least some hysterisis going on
       between previous and next stroke, but I don't know how
@@ -146,7 +146,7 @@ td {vertical-align: top;}
     </tr>
 </table>
 <h2>Difficulty:</h2>
-You can reduce the difficulty of exercises by practicing only subsets of the Steno keyboard. <input type="submit" value="Enable all" onclick="$('#difficultybtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#difficultybtns input').prop('checked', false);" />
+You can reduce the difficulty of an exercise by stroking a subset of the keys of the true strokes: this is good for working on muscle memory.  <input type="submit" value="Enable all" onclick="$('#difficultybtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#difficultybtns input').prop('checked', false);" />
 <table id="difficultybtns">
     <tr>
         <td><input type="checkbox" id="enable-left" value="left" checked></td>
@@ -164,18 +164,32 @@ You can reduce the difficulty of exercises by practicing only subsets of the Ste
         </td>
     </tr>
     <tr>
-        <td><input type="checkbox" id="enable-asterisk" value="asterisk" checked></td>
-        <td><strong class="boxLabel">Asterisk</strong> If this is unchecked, words which must be disambiguated with an asterisk will not be given.
-        </td>
-    </tr>
-    <tr>
         <td><input type="checkbox" id="enable-right" value="right" checked></td>
         <td><strong class="boxLabel">Right hand</strong> (FRPBLGTSDZ)
         </td>
     </tr>
+</table>
+<h2>Filter:</h2>
+You can skip difficult words by filtering them out.  <input type="submit" value="Enable all" onclick="$('#filterbtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#filterbtns input').prop('checked', false);" />
+<table id="filterbtns">
+    <tr>
+        <td><input type="checkbox" id="enable-asterisk" value="asterisk" checked></td>
+        <td><strong class="boxLabel">Asterisk</strong> If this is unchecked, words which must be disambiguated with an asterisk will not be tested.
+        </td>
+    </tr>
     <tr>
         <td><input type="checkbox" id="enable-multistroke" value="multistroke" checked></td>
-        <td><strong class="boxLabel">Multi-stroke</strong> If this is unchecked, only the first stroke of multi-stroke words will be tested.
+        <td><strong class="boxLabel">Multi-stroke</strong> If this is unchecked, words which require multiple strokes will not be tested.  (Watch out if they're briefed, however!)
+        </td>
+    </tr>
+    <tr>
+        <td><input type="checkbox" id="enable-briefs" value="briefs" checked></td>
+        <td><strong class="boxLabel">Briefs</strong> If this is unchecked, briefed words will not be tested.
+        </td>
+    </tr>
+    <tr>
+        <td><input type="checkbox" id="enable-misstrokes" value="briefs" checked></td>
+        <td><strong class="boxLabel">Misstrokes</strong> If this is unchecked, common misstrokes which would have been accepted by Plover will not be accepted.
         </td>
     </tr>
 </table>
@@ -331,14 +345,32 @@ Pack my box with five dozen liquor jugs.
 // ----------------------------------------------------------------------------
 // Dictionary initialization
 var rdata = {"i": ["EU"]};
+/*
 $.getJSON("dict.json", function(dict) {
         $.each( dict, function(k,rv) {
             if (/\d/.test(k)) return;
             var v = rv.toLowerCase();
             if (rdata.hasOwnProperty(v)) { // watch
-                rdata[v].push(k);
+                rdata[v].push({stroke: k});
             } else {
-                rdata[v] = [k];
+                rdata[v] = [{stroke: k}];
+            }
+            });
+        init();
+        });
+        */
+$.getJSON("categorized.json", function(dict) {
+        $.each( dict, function(i,e) {
+            var k = e[1];
+            var rv = e[0];
+            var cat = e[2];
+            if (/\d/.test(k)) return;
+            var v = rv.toLowerCase();
+            var stroke = {stroke: k, category: cat.split(" ")}
+            if (rdata.hasOwnProperty(v)) { // watch
+                rdata[v].push(stroke);
+            } else {
+                rdata[v] = [stroke];
             }
             });
         init();
@@ -361,13 +393,32 @@ function bestStroke(strokes) {
             });
     return cand;
 }
-function filterDifficulty(stroke) {
+function filterDifficultyOnlyGood(stroke_entry) {
+    if ($.inArray("misstroke", stroke_entry.category) != -1) return false;
+    return filterDifficulty(stroke_entry);
+}
+function filterDifficulty(stroke_entry) {
+    var stroke = stroke_entry.stroke;
+    // handle the filters first
+    if (!$("#enable-briefs").prop("checked") && $.inArray("brief", stroke_entry.category) != -1) {
+        return false;
+    }
+    if (!$("#enable-misstrokes").prop("checked") && $.inArray("misstroke", stroke_entry.category) != -1) {
+        return false;
+    }
+    if (!$("#enable-asterisk").prop("checked") && stroke.contains("*")) {
+        return false;
+    }
+    if (!$("#enable-multistroke").prop("checked") && stroke.contains("/")) {
+        return false;
+    }
     var strokes = stroke.split("/");
     var r = [];
     for (var i = 0; i < strokes.length; i++) {
-        if (!$("#enable-asterisk").prop("checked") && strokes[i].indexOf("*") != -1) return false;
         var leftLetters = "", rightLetters = "", middleLetters = "";
-        if ($("#enable-left").prop("checked")) { leftLetters = getLeftLettersFromSteno(strokes[i]); }
+        if ($("#enable-left").prop("checked")) {
+            leftLetters = getLeftLettersFromSteno(strokes[i]);
+        }
         if ($("#enable-left-vowels").prop("checked") || $("#enable-right-vowels").prop("checked") ) {
             middleLetters = getMiddleLettersFromSteno(strokes[i]);
             if (!$("#enable-left-vowels").prop("checked") && middleLetters.match(/[AO]/)) {
@@ -377,12 +428,13 @@ function filterDifficulty(stroke) {
                 return false;
             }
         }
-        if ($("#enable-right").prop("checked")) { rightLetters = getRightLettersFromSteno(strokes[i]); }
-        if (middleLetters.length == 0 && rightLetters.length > 0) { middleLetters = "-"; }
-        r.push(leftLetters + middleLetters + rightLetters);
-        if (!$("#enable-multistroke").prop("checked")) {
-            break;
+        if ($("#enable-right").prop("checked")) {
+            rightLetters = getRightLettersFromSteno(strokes[i]);
         }
+        if (middleLetters.length == 0 && rightLetters.length > 0) {
+            middleLetters = "-";
+        }
+        r.push(leftLetters + middleLetters + rightLetters);
     }
     return r.join("/");
     //var steno = stroke.split('/')[0];
@@ -503,15 +555,19 @@ var S_DONE = 2;
 function copyExerciseWord(word_entry) {
     return {word: word_entry.word,
         strokes: word_entry.strokes,
+        goodStrokes: word_entry.goodStrokes,
+        bestStroke: word_entry.bestStroke,
+        bestStrokeArray: word_entry.bestStrokeArray,
         recognized: word_entry.recognized,
         user: word_entry.user.slice(0),
         status: word_entry.status
     }
 }
-function mkExerciseWord(word, strokes, recognized) {
-    var best_stroke = bestStroke(strokes);
+function mkExerciseWord(word, strokes, good_strokes, recognized) {
+    var best_stroke = bestStroke(good_strokes);
     return {word: word,
         strokes: strokes,
+        goodStrokes: good_strokes,
         bestStroke: best_stroke,
         bestStrokeArray: stenoArray(best_stroke),
         recognized: recognized,
@@ -537,10 +593,11 @@ function loadData() {
                     if (/\S/.test(word)) {
                         var strokes = wordStrokes(word);
                         var t_strokes = mapFilter(strokes, filterDifficulty);
-                        if (t_strokes) {
+                        var good_strokes = mapFilter(strokes, filterDifficultyOnlyGood);
+                        if (good_strokes) {
                             sub_c++;
                         }
-                        cur.push(mkExerciseWord(word, t_strokes, !!strokes.length));
+                        cur.push(mkExerciseWord(word, t_strokes, good_strokes, !!strokes.length));
                     }
                     });
                 if (cur.length > 0) data.push({index: c, words: cur});
@@ -553,12 +610,18 @@ function loadData() {
                 var words = line.split(" ");
                 $.each( words, function(i, rword) {
                     var word = depunctuateWord(rword);
-                    var t_strokes = mapFilter(wordStrokes(word), filterDifficulty);
-                    if (/\S/.test(word) && t_strokes.length) {
-                        corpus.push(mkExerciseWord(word, t_strokes, true));
+                    var strokes = wordStrokes(word);
+                    var t_strokes = mapFilter(strokes, filterDifficulty);
+                    var good_strokes = mapFilter(strokes, filterDifficultyOnlyGood);
+                    if (/\S/.test(word) && good_strokes.length) {
+                        corpus.push(mkExerciseWord(word, t_strokes, good_strokes, true));
                     }
                     });
                 });
+        if (!corpus.length) {
+            $("#viewport").html("<em>No data</em>");
+            return;
+        }
         // Make me a Markov chain
         $.each(corpus, function(i1,e1) {
             if ($("#randomShift").is(':checked')) {
@@ -573,12 +636,12 @@ function loadData() {
                         scores[score].push(e2);
                     });
                 for (var j = 0; j < scores.length; j++) {
-                    if (scores[j]) {
+                    if (scores[j].length) {
                         e1.transitions = scores[j];
                         break;
                     }
                 }
-                if (!e1.transitions) {
+                if (!e1.transitions || !e1.transitions.length) {
                     e1.transitions = corpus;
                 }
             } else {
@@ -638,7 +701,7 @@ function prevWord() {
         var word_entry = getCurrentWord();
         word_entry.status = S_PENDING;
         paintWord(word_entry);
-        if (!first && word_entry.recognized && word_entry.strokes.length) break;
+        if (!first && word_entry.recognized && word_entry.goodStrokes.length) break;
         if (cur_line == 0 && cur_word == 0) break;
         if (cur_word == 0) {
             repaint_line = true;
@@ -736,7 +799,7 @@ function finishExercise() {
                 var annot = "";
                 if (!word.recognized) {
                 } else if (cur_mode == "speed") {
-                    annot = diffSteno(word.user[word.user.length-1], bestStroke(word.strokes));
+                    annot = diffSteno(word.user[word.user.length-1], word.bestStroke);
                 } else if (cur_mode == "accuracy") {
                     // TODO: color code for victory
                     // two significant digits at all times
@@ -763,9 +826,7 @@ function finishExercise() {
 function setupWord() {
     var word_entry = getCurrentWord();
     var word = word_entry.word;
-    var strokes = wordStrokes(word);
-    var t_strokes = mapFilter(strokes, filterDifficulty);
-    if (!t_strokes.length) {
+    if (!word_entry.goodStrokes.length) {
         return nextWord();
     }
     function strokeCompare(a,b) {
@@ -776,7 +837,8 @@ function setupWord() {
     }
     currentDrillItem = {
         "Text": word,
-        "Value": mungeStrokes(t_strokes),
+        "GoodValue": mungeStrokes(word_entry.goodStrokes),
+        "Value": mungeStrokes(word_entry.strokes),
     }
     paintWord(word_entry);
     word_entry.elem.addClass("current");
@@ -849,7 +911,7 @@ function showAnswerPrompt(steno) {
     var we = getCurrentWord();
     we.user.push(steno);
     var cands = currentDrillItem.
-        Value.
+        GoodValue.
         split(",").
         filter(function(v){return v.indexOf(answerGivenSoFar) == 0}).
         map(function(v) {return v.substring(answerGivenSoFar.length)});
