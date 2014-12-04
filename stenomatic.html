@@ -9,6 +9,9 @@ Things I know how to implement:
       left while the other goes right; also same motion),
       using different probability distributions.
 
+      Confusion is not good when there are only two choices (vowel)
+      disable it in that case.
+
     * Markov generated random text based on the input corpus (Ha Ha)
 
     * Smooth scrolling, use
@@ -76,6 +79,8 @@ Bugs:
     * Partial strokes UI is pretty confusing.  Can we chunk up the
       words somehow to give partial progress?  Seems algorithmically tricky.
 
+    * WPM is nonsense if you use the backwards/forwards arrow
+
 -->
 <html>
 <head>
@@ -111,8 +116,10 @@ td {vertical-align: top;}
 <div id="viewport"><em>Loading Dictionary...</em></div>
 <div>
 <input type="text" id="txtInput">
+<!--
 <input type="submit" value="&lt;" id="prevbtn">
 <input type="submit" value="&gt;" id="nextbtn">
+-->
 <input type="submit" value="Restart" id="loadbtn2">
 </div>
 <div id="barometer"></div>
@@ -317,6 +324,88 @@ Pack my box with five dozen liquor jugs.
     'election' 'auction' 'correction' 'collection' 'fraction' 'friction' 'depiction' 'selection' 'seduction'
     'finch' 'clench' 'branch' 'march' 'lurch' 'lynch' 'birch' 'brunch' 'church' 'drench'
     </textarea>
+    <textarea id="learnplover-cumulative" name="[Learn Plover] All Exercises">
+    'sap' 'sag' 'sat' 'sass' 'sad' 'sop' 'sob' 'sell' 'set' 'says'
+    'tar' 'tap' 'tab' 'tag' 'tad' 'tour' 'top' 'toll' 'tell' 'tough' 'tub' 'tug'
+    'car' 'cap' 'cab' 'cat' 'cad' 'core' 'cop' 'cog' 'cot' 'cod' 'keg' 'cuff' 'cur' 'cup' 'cub' 'cull' 'cut' 'cuss'
+    'pal' 'pat' 'pass' 'pad' 'pour' 'poll' 'pot' 'pod' 'pep' 'peg' 'pet' 'puff' 'pup' 'pub' 'pull' 'pug' 'put' 'pus'
+    'war' 'wag' 'wad' 'was' 'wore' 'web' 'well' 'wet' 'wed'
+    'half' 'hag' 'hat' 'had' 'has' 'hop' 'hog' 'hot' 'her' 'hell' 'head' 'huff' 'hub' 'hull' 'hug' 'hut'
+    'rap' 'rag' 'rat' 'roar' 'rob' 'roll' 'rot' 'rod' 'red' 'rough' 'rub' 'rug' 'rut'
+    'still', 'rig', 'hit', 'sip'
+    'sir', 'skirt'
+    'crypt', 'syrup'
+    'pig' 'rift' 'scribble' 'rid' 'river'
+    'hid' 'wilt' 'wig' 'wit' 'spill'
+    'aids' 'ace' 'ate' 'able' 'ape' 'raid' 'raise' 'rail' 'rate' 'pay' 'paid' 'pace' 'tape' 'spray' 'praise'
+    'weaver' 'trees' 'eel' 'eat' 'evil' 'ear' 'heat' 'heap' 'wield' 'weird' 'peer' 'priest' 'tree' 'tweeze' 'tweed' 'seat' 'cease' 'seed' 'seize' 'secrete'
+    'ire' 'I'll' 'ice' 'rife' 'ripe' 'right' 'height' 'wild' 'pipe' 'pride' 'prize' 'kite' 'type' 'spite' 'drive'
+    'hope' 'spore' 'post' 'sold' 'prose' 'ode' 'oat' 'over' 'robe' 'rope' 'roar' 'rove' 'host' 'wove' 'wrote' 'pole' 'pose' 'cope' 'coat' 'code' 'crow' 'told'
+    'cube' 'use' 'rude' 'rule' 'pure' 'prude' 'Proust' 'cure' 'cruel' 'crude' 'cruise' 'truce' 'truth' 'spew' 'skew'
+    'all' 'awful' 'raw' 'call' 'caught' 'crawl' 'sprawl' 'scald' 'straw' 'halt' 'hall' 'wall'
+    'out' 'how' 'howl' 'house' 'pout' 'power' 'prowl' 'tower' 'spouse' 'sprout' 'scour'
+    'soy' 'oil' 'coil' 'toil' 'soil'
+    'wheel' 'wheal' 'read' 'reed' 'reel' 'real' 'heel' 'heal' 'hear' 'here' 'ware' 'wear' 'pea' 'pee' 'peace' 'piece' 'tee' 'tea' 'sea' 'see'
+    'tail' 'tale' 'sale' 'sail' 'stare' 'stair' 'waist' 'waste'
+    'hood' 'rude' 'pool' 'crew' 'soot' 'truce' 'school' 'ruse'
+    'road' 'rode' 'roar' 'toad' 'soar' 'sore'
+    'due' 'duffer' 'deferral' 'devil' 'double' 'drug' 'depress' 'desire' 'dessert' 'destroyed'
+    'feral' 'ford' 'for' 'phrase' 'fierce' 'fable' 'feeble' 'sphere' 'fries'
+    'leader' 'lace' 'letter' 'lust' 'lovers'
+    'glad' 'glare' 'glides' 'give' 'get' 'group' 'guest' 'guide' 'gravel' 'cigarette' 'goblet'
+    'bored' 'board' 'bruise' 'buyer' 'bobble' 'brutal'
+    'zest' 'zap' 'zag'
+    'vile' 'vase' 'virus'
+    'eke' 'rockets' 'correct' 'quake' 'task'
+    'nag' 'nap' 'nab' 'nut' 'never' 'nestle' 'nod' 'nest' 'nerd'
+    'pent' 'parent' 'went' 'earns' 'rant' 'hunt' 'hand' 'panel' 'stun'
+    'must' 'muffle' 'maggot' 'mallet' 'smuggle' 'morals'
+    'arm' 'rum' 'harm' 'tempt' 'term'
+    'calmed' 'palm' 'qualms'
+    'jut' 'jug' 'just' 'jest' 'jets' 'job' 'jostle' 'jazz' 'jagged'
+    'urge' 'edge' 'average' 'purge' 'trudge' 'storage'
+    'yard' 'yet' 'yacht' 'yurt'
+    'noun' 'inhibit' 'nudge' 'notes' 'knack' 'enacts' 'neck' 'known' 'knock' 'gnome' 'noise' 'novice' 'named' 'neural' 'snide' 'announce'
+    'loin' 'donor' 'winner' 'dinner' 'learned' 'lend' 'allowance' 'flaunt' 'deference' 'different' 'dance' 'diner' 'demand' 'grunt' 'grant' 'gleans' 'severance' 'cement' 'design'
+    'mound' 'mourn' 'maim' 'matter' 'commit' 'commend' 'smudge' 'smuggle' 'semester'
+    'forms' 'primed' 'serum' 'time' 'hermit' 'maim' 'plumb' 'dream' 'gym' 'germ' 'jam' 'blame' 'bottom' 'grammar'
+    'balm' 'psalm'
+    'judge' 'journal' 'join' 'joyful' 'jam' 'gerunds'
+    'forge' 'budgets' 'average' 'leverage' 'merge' 'beige' 'carriage' 'fidget' 'frigid' 'digit' 'gadget' 'garage' 'grudge' 'turgid'
+    'year' 'yearn' 'yolk'
+    'thefts' 'thud' 'thus' 'thug'
+    'hath' 'earth' 'oath' 'health' 'wealth' 'worth' 'path' 'troth'
+    'chess' 'chest' 'chart' 'chat' 'chop' 'chore' 'chaff'
+    'touch' 'etch' 'ratchet' 'hutch' 'hatch' 'watch' 'patch' 'catch' 'crutch' 'such' 'sketch' 'stretch' 'retch'
+    'shell' 'shuffled' 'shall' 
+    'ash' 'rush' 'rash' 'hush' 'hash' 'wash' 'push' 'posh' 'crush' 'crash' 'trash' 'squash' 'stash'
+    'anger' 'storing' 'rung' 'rang' 'prong' 'tongue' 'twang' 'song' 'stung' 'strong'
+    'sponge' 'orange' 
+    'thing' 'thence' 'them' 'thumb' 'thrill' 'throng' 'thrash'
+    'seethe' 'method' 'math' 'birth' 'breath' 'fifth' 'death' 'sleuth' 'blithe' 'growth'
+    'choose' 'chasm' 'chuck' 'check' 'churn' 'cherub' 'chin' 'channel' 'chant' 'chance' 'chive' 'charm'
+    'bleach' 'much' 'latch' 'leech' 'match' 'botch' 'fetch' 'ditch' 'glitch' 'vouch' 'slouch' 'smooch' 'splotch'
+    'shim' 'slime' 'shrewd' 'shrine' 'shuck' 'shark' 'shock' 'sheesh' 'shrivel' 'sugar'
+    'lash' 'mesh' 'mash' 'plush' 'bush' 'brush' 'fish' 'fresh' 'flush' 'flesh' 'flash' 'dash' 'delish' 'gosh' 'gash' 'shush' 'slash' 'smush' 'slosh' 'splash' 'squish' 'Irish'
+    'anger' 'finger' 'dung' 'lung' 'ping' 'pong' 'among' 'bring' 'young' 'fang' 'flung' 'gang' 'belong'
+    'change' 'range' 'hinge' 'lounge' 'plunge' 'cringe' 'tinge' 'fringe' 'derange' 'grunge' 'syringe'
+    'hemp' 'trump' 'rump' 'romp' 'ramp' 'pump' 'camp' 'cramp' 'tamp' 'pomp'
+    'curve' 'carve' 'serve' 'swerve' 'starve' 
+    'squelch'
+    'hulk' 'calc' 'sulk' 'talc'
+    'rank' 'honk' 'wonk' 'prank' 'crank' 'tank'
+    'session' 'option' 'ration' 'portion' 'passion' 'cushion' 'caption' 'suppression'
+    'section' 'correction' 'suction'
+    'arch' 'ranch' 'hunch' 'porch' 'crunch' 'quench' 'torch' 'trench' 'stench' 'starch' 
+    'limp' 'blimp' 'chomp' 'clamp' 'damp' 'slump' 'shrimp' 'jump'
+    'nerve' 'verve' 'marvel'
+    'village' 'mulch' 'bulge' 'belch' 'bilge' 'gulch' 'pillage'
+    'ilk' 'milk' 'bulk' 'silk' 'bilk'
+    'wink' 'mink' 'plank' 'brink' 'blink' 'blank' 'flank' 'flunk' 'dank' 'drink' 'gunk' 'junk' 'link' 'chunk'
+    'lesion' 'provision' 'fusion' 'lotion' 'operation' 'mission' 'motion' 'pollution'
+    'election' 'auction' 'correction' 'collection' 'fraction' 'friction' 'depiction' 'selection' 'seduction'
+    'finch' 'clench' 'branch' 'march' 'lurch' 'lynch' 'birch' 'brunch' 'church' 'drench'
+    </textarea>
     <textarea id="ploverwiki-common" name="[Plover Wiki] Practice Sentences with Common English Words">
     So is this working? 
     Take that! 
@@ -427,6 +516,8 @@ function filterDifficulty(stroke_entry) {
             if (!$("#enable-right-vowels").prop("checked") && middleLetters.match(/[EU]/)) {
                 return false;
             }
+        } else {
+            if (strokes[i].contains("*")) middleLetters = "*";
         }
         if ($("#enable-right").prop("checked")) {
             rightLetters = getRightLettersFromSteno(strokes[i]);
@@ -434,7 +525,9 @@ function filterDifficulty(stroke_entry) {
         if (middleLetters.length == 0 && rightLetters.length > 0) {
             middleLetters = "-";
         }
-        r.push(leftLetters + middleLetters + rightLetters);
+        var seg = leftLetters + middleLetters + rightLetters;
+        if (!seg) return;
+        r.push(seg);
     }
     return r.join("/");
     //var steno = stroke.split('/')[0];
@@ -564,12 +657,12 @@ function copyExerciseWord(word_entry) {
     }
 }
 function mkExerciseWord(word, strokes, good_strokes, recognized) {
-    var best_stroke = bestStroke(good_strokes);
+    var best_stroke = good_strokes.length ? bestStroke(good_strokes) : undefined;
     return {word: word,
         strokes: strokes,
         goodStrokes: good_strokes,
         bestStroke: best_stroke,
-        bestStrokeArray: stenoArray(best_stroke),
+        bestStrokeArray: best_stroke ? stenoArray(best_stroke) : undefined,
         recognized: recognized,
         user: [], // what you stroked in
         status: S_PENDING};
