@@ -1,0 +1,3 @@
+[submodule "tabletop"]
+	path = tabletop
+	url = https://github.com/jsoma/tabletop.git

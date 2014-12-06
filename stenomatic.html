@@ -87,6 +87,7 @@ Bugs:
 <title>Stenomatic 9000</title>
 <link rel="prefetch" href="dict.json">
 <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+<script src="tabletop/src/tabletop.js"></script>
 <style>
 html {overflow-y: scroll;}
 #viewport { font-size: 2em; }
@@ -207,6 +208,13 @@ You can skip difficult words by filtering them out.  <input type="submit" value=
 The quick brown fox jumps over the lazy dog.
 Pack my box with five dozen liquor jugs.
 </textarea>
+<hr />
+<h2>Analytics</h2>
+<p>Psst! I can also save your progress to Google Drive.  Make a new spreadsheet,
+click <em>Share</em>, <em>Get shareable link</em>, set the permissions
+to <em>Anyone with the link can edit</em>, and paste it here: <input type="text" id="drive-url">
+</p>
+
 <div style="display:none;" id="samples">
     <textarea id="learnplover-1-left" name="[Learn Plover] 1. One-Syllable Words (Left)">
     'sap' 'sag' 'sat' 'sass' 'sad' 'sop' 'sob' 'sell' 'set' 'says'
@@ -466,6 +474,7 @@ $.getJSON("categorized.json", function(dict) {
         });
 
 function depunctuateWord(rword) {
+    // only strip leading/trailing single quotes
     return rword.replace(/[!"#$%&\\\(\)*+,-.\/:;<=>?@\[\]\^_`{|}~]/g, "").replace(/^'/, "").replace(/'$/, "");
 }
 function cleanWord(rword) {
@@ -639,6 +648,10 @@ function init() {
         paintLine();
         nextWord();
         });
+    $("#drive-url").val(docCookies.getItem("stenomatic-drive-url"));
+    $("#drive-url").bind("propertychange change click keyup input paste", function () {
+            docCookies.setItem("stenomatic-drive-url", $("#drive-url").val(), Infinity);
+            });
     loadData();
     updateMode();
 }
@@ -1586,6 +1599,48 @@ function keyUp(event) {
         }
     }
 }
+
+// cookies.js
+
+var docCookies = {
+  getItem: function (sKey) {
+    if (!sKey) { return null; }
+    return decodeURIComponent(document.cookie.replace(new RegExp("(?:(?:^|.*;)\\s*" + encodeURIComponent(sKey).replace(/[\-\.\+\*]/g, "\\$&") + "\\s*\\=\\s*([^;]*).*$)|^.*$"), "$1")) || null;
+  },
+  setItem: function (sKey, sValue, vEnd, sPath, sDomain, bSecure) {
+    if (!sKey || /^(?:expires|max\-age|path|domain|secure)$/i.test(sKey)) { return false; }
+    var sExpires = "";
+    if (vEnd) {
+      switch (vEnd.constructor) {
+        case Number:
+          sExpires = vEnd === Infinity ? "; expires=Fri, 31 Dec 9999 23:59:59 GMT" : "; max-age=" + vEnd;
+          break;
+        case String:
+          sExpires = "; expires=" + vEnd;
+          break;
+        case Date:
+          sExpires = "; expires=" + vEnd.toUTCString();
+          break;
+      }
+    }
+    document.cookie = encodeURIComponent(sKey) + "=" + encodeURIComponent(sValue) + sExpires + (sDomain ? "; domain=" + sDomain : "") + (sPath ? "; path=" + sPath : "") + (bSecure ? "; secure" : "");
+    return true;
+  },
+  removeItem: function (sKey, sPath, sDomain) {
+    if (!this.hasItem(sKey)) { return false; }
+    document.cookie = encodeURIComponent(sKey) + "=; expires=Thu, 01 Jan 1970 00:00:00 GMT" + (sDomain ? "; domain=" + sDomain : "") + (sPath ? "; path=" + sPath : "");
+    return true;
+  },
+  hasItem: function (sKey) {
+    if (!sKey) { return false; }
+    return (new RegExp("(?:^|;\\s*)" + encodeURIComponent(sKey).replace(/[\-\.\+\*]/g, "\\$&") + "\\s*\\=")).test(document.cookie);
+  },
+  keys: function () {
+    var aKeys = document.cookie.replace(/((?:^|\s*;)[^\=]+)(?=;|$)|^\s*|\s*(?:\=[^;]*)?(?:\1|$)/g, "").split(/\s*(?:\=[^;]*)?;\s*/);
+    for (var nLen = aKeys.length, nIdx = 0; nIdx < nLen; nIdx++) { aKeys[nIdx] = decodeURIComponent(aKeys[nIdx]); }
+    return aKeys;
+  }
+};
 
 </script>
 </body>
