@@ -1,0 +1,22 @@
+html {overflow-y: scroll;}
+#viewport { font-size: 2em; }
+.brief {color: blue;}
+.nostroke {color: purple;}
+.done {color: grey;}
+.current {background:#DDD}
+.complete {background:#9F9}
+.incorrect {color: #F99;}
+#chkPlainTextInput {display: none}
+.boxLabel {margin-right:1em;}
+h2 {font-size:1.2em;}
+td {vertical-align: top;}
+.many {margin-left:2em;text-indent:-2em;}
+.many .done {color: #000}
+.many .incorrect {color: #EEE; background:#600;}
+.over {font-size:2em; padding:0;}
+.under {font-size:0.8em; padding:0;padding-top:-0.4em;padding-bottom:0.4em;font-family:Arial;}
+.under .diff sub {color:red;}
+.under .diff sup {color:green;}
+.under .errorCount {color:red;}
+.unit {cursor: pointer; display:inline;text-align:center; border-collapse: collapse; border-spacing: 0;}
+.wordstat {}
