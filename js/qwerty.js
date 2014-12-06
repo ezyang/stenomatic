@@ -1,4 +1,18 @@
-// Here is the library code.
+// Lifted from Qwerty Steno.
+
+// Functions that must be implemented
+//  function showAnswerPrompt(steno) {}
+//  function setStenoKeyboardPressedKeys() {}
+//  function clearStenoKeyboardPressed() {}
+//  function hideAnswerPrompt() {}
+//  function showWpm() {}
+//  function setNextDrillItem(steno) {}
+//  function possibleAnswerClick() {}
+//  function showDrillItem() {}
+//
+// HTML IDs that must be implemented
+//  #chkPlainTextInput
+//  #txtInput
 
 var currentTdAnswer = 0;
 var itemsAnswered = 0;

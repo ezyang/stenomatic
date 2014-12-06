@@ -3,6 +3,7 @@
 var rdata = {"i": ["EU"]};
 
 /*
+// Code for Plover style dictionary
 $.getJSON("dict.json", function(dict) {
         $.each( dict, function(k,rv) {
             if (/\d/.test(k)) return;
@@ -186,10 +187,18 @@ function init() {
     $("#drive-url").val(docCookies.getItem("stenomatic-drive-url"));
     $("#drive-url").bind("propertychange change click keyup input paste", function () {
             docCookies.setItem("stenomatic-drive-url", $("#drive-url").val(), Infinity);
+            updateDrive();
             });
+    updateDrive();
     loadData();
     updateMode();
 }
+function updateDrive() {
+    if ($("#drive-url").val()) {
+        // TODO
+    }
+}
+
 var S_PENDING = 0;
 var S_INCORRECT = 1;
 var S_DONE = 2;
