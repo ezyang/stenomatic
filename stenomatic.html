@@ -1,9 +1,9 @@
 <html>
 <head>
+<meta charset="UTF-8">
 <title>Stenomatic 9000</title>
 <link rel="prefetch" href="categorized.json">
 <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
-<script src="tabletop/src/tabletop.js"></script>
 <script src="js/util.js"></script>
 <script src="js/cookies.js"></script>
 <script src="js/steno.js"></script>
@@ -48,7 +48,7 @@
     </tr>
     <tr>
         <td><input type="radio" name="style" value="randomized"></td>
-        <td><strong class="boxLabel">Randomized</strong> Generate <input type="text" id="randomLength" value="100" size="1"> random words sampled from the source input (weighted based on occurrence frequency).<br><input type="checkbox" id="randomShift"> Maximize finger movement by preventing similar words from being adjacent.</td>
+        <td><strong class="boxLabel">Randomized</strong> Generate <input type="text" id="randomLength" value="50" size="1"> random words sampled from the source input (weighted based on occurrence frequency).<br><input type="checkbox" id="randomShift"> Maximize finger movement by preventing similar words from being adjacent.</td>
     </tr>
 </table>
 <h2>Difficulty:</h2>
@@ -108,10 +108,8 @@ Pack my box with five dozen liquor jugs.
 </textarea>
 <hr />
 <h2>Analytics</h2>
-<p>Psst! I can also save your progress to Google Drive.  Make a new spreadsheet,
-click <em>Share</em>, <em>Get shareable link</em>, set the permissions
-to <em>Anyone with the link can edit</em>, and paste it here: <input type="text" id="drive-url"> (actually, not implemented fully yet)
-</p>
+<input type="submit" value="Dump analytics" id="dumpbtn"><br>
+<textarea id="analytics" cols="80" rows="5"></textarea>
 
 <div style="display:none;" id="samples">
     <textarea id="learnplover-1-left" name="[Learn Plover] 1. One-Syllable Words (Left)">
@@ -230,6 +228,9 @@ to <em>Anyone with the link can edit</em>, and paste it here: <input type="text"
     'election' 'auction' 'correction' 'collection' 'fraction' 'friction' 'depiction' 'selection' 'seduction'
     'finch' 'clench' 'branch' 'march' 'lurch' 'lynch' 'birch' 'brunch' 'church' 'drench'
     </textarea>
+    <textarea id="learnplover-4-briefs" name="[Learn Plover] Common Briefs">
+ the of to in a is that with be by he I this are which have they you you'd you'll you're you've were can there been if would who other what only do new about two any could after said very many even where through being because before upon without another against every within example others therefore having become whether somebody somehow someone someplace something sometimes somewhere question almost interest ever became probably include includes included including amount receive received
+    </textarea>
     <textarea id="learnplover-cumulative" name="[Learn Plover] All Exercises">
     'sap' 'sag' 'sat' 'sass' 'sad' 'sop' 'sob' 'sell' 'set' 'says'
     'tar' 'tap' 'tab' 'tag' 'tad' 'tour' 'top' 'toll' 'tell' 'tough' 'tub' 'tug'
@@ -335,6 +336,560 @@ to <em>Anyone with the link can edit</em>, and paste it here: <input type="text"
     At its general time, but still while they were here. 
     Of which one is that? 
     </textarea>
+    <!-- TODO support dropping words! -->
+    <textarea id="shastay-magic-drill" name="[The Shastay Way] The Magic Drill">
+   That would be fine.  Who can be sure?  So far,
+   so good.  They have a car.  What is the time?
+   That is the end.  They should make it.  No sir,
+   not us.  We could do it.  No, ma'am, you win.
+   Park it out there.  She was a nurse.  This would
+   go well.  You are the best.  They could take two.
+   Yes, sir, he won.  She would work hard.  I can
+   do it.  They were on top.
+
+   This is the one.
+   I want to win.  He is bad news.  Will the
+   snow come?  I have the note.  She is the girl.
+   We can wash it.  There are a lot.  Who could
+   tell me?  We had it last.  He should walk up.
+   It was put there.  Who can make room?  They would
+   look there.  Where is it at?  There would be more.
+   I want to act.  When is the song?  Where is
+   your home?  I have to paint.  There is much more.
+
+   They were the worst.   Will the class start?  They were
+   near home.  He is too slow.  I have a pet.
+   I should take it.   So much for that.  That is
+   the row.  He said to go.  I have a chance.
+   Is the horse gone?  That was my cake.  Too much
+   was said.  Which are the same?  Yes, ma'am, drive up.
+   She was the best.  They had a stall.   No, sir,
+   wait here.   That is the fruit.  We can make it.
+    </textarea>
+    <textarea id="shastay-difficult-right" name="[The Shastay Way] Difficult Right-Hand Strokes">
+        Church Bench Best Myth Fish Watch Session Mansion Faction
+        Sanction Love Crucial Precious Patient Prism Ability Livable
+        Curve Ramp Next Little Vital Band Fact Given
+    </textarea>
+    <textarea id="drillz-right-hand" name="[Drillz] Right Hand Drills">#raw-right
+
+F L P T F T F L F P
+R S G B R G S B R
+
+F B S F G B S P R G P R
+G P G F R G T F R G P G
+
+L R L G L F S L B G T L S
+S F S L B S T S L R S F L S
+
+T F T B L B T F S T L R S F
+B L F R B S T B L P B G L T
+
+
+FP LT FL PT FL PT LT FP
+RB GS RG BS RS BG GS
+
+F PL FL FPL LT FPL FP PL FPL
+R RG RS RB BS GS RS RB RG
+
+FR PB F FP PB RB FR FP PB RB
+FRP B FRL G FRT S FRP PLT FRP
+
+FRB G FRS L FRB T FRG B FRS G
+P B L G P G B L PB BL BG PG P G B L
+
+PB PG BL BG G P L B PB LG PL BG BL
+FLT PLT FPL FPT RBG BGS BGS RBS
+
+PBG PLG PBG PLG PBL PBG PLG PBL BLG
+PB LS F FB L LS L FB G RP FRP L FB FRB
+
+FBG FGS RPL PLT FG RL FB FBG RL RPL
+FBGS FGS FBGS RPLT RLT RPLT RPT FGS
+
+F B L S F B S G F L B S F B L S FB LS FB BL LS
+R P G T R G P T R G T P RP GT RPG GT PG PGT
+
+P R PG PT B F B S B L T P PB  L FP BG PG L R PG BG
+L B BL PL RL BL P LS LT LS B T LT F R B L S LS GT FL
+
+S L G T S L G L GS LS T GT GS LT R GS FLT RGS FPS LS RBT GT
+BTS PLT PLS BGT FLS RLS RLT FLT FTS PS BT
+
+FGS FGT RLT RLS RLGS RLGT FGT FGS FPGS
+FBLT FBLG FBLGT FPLS BLS BLT FBLS FBLT
+    </textarea>
+<textarea id="drillz-left-hand" name="[Drillz] Tedley Left Hand">#raw
+
+S H T P S R K W
+S P H T S W R K
+S T H P S K R W
+S H P T S R W K
+
+P T H S W K R S
+T H P S K R W S
+P H T S W R K S
+T P H S K W R S
+
+S T W H S K P R
+S H T W S R K P
+S W H T S P K R
+S T H W S K R P
+
+H W T S R P K S
+W T H S P K R S
+T H W S R K P S
+W H T S P R K S
+
+S K T W P S H R
+S W K T P R S H
+S T K W P H S R
+S K W T P S R H
+
+W T K S R H S P
+T K W S H S R P
+W K T S P H S R
+T W K S H R S P
+
+S H T P S R K W
+S P H T S W R K
+S T H P S K R W
+S H P T S R W K
+
+P T H S W K R S
+T H P S K R W S
+P H T S W R K S
+T P H S K W R S
+
+S T W H S K P R
+S H T W S R K P
+S W H T S P K R
+S T H W S K R P
+
+H W T S R P K S
+W T H S P K R S
+T H W S R K P S
+W H T S P R K S
+
+S K T W P S H R
+S W K T P R S H
+S T K W P H S R
+S K W T P S R H
+
+W T K S R H S P
+T K W S H S R P
+W K T S P H S R
+T W K S H R S P
+
+S H T P S R K W
+S P H T S W R K
+S T H P S K R W
+S H P T S R W K
+
+P T H S W K R S
+T H P S K R W S
+P H T S W R K S
+T P H S K W R S
+
+S T W H S K P R
+S H T W S R K P
+S W H T S P K R
+S T H W S K R P
+
+H W T S R P K S
+W T H S P K R S
+T H W S R K P S
+W H T S P R K S
+
+S K T W P S H R
+S W K T P R S H
+S T K W P H S R
+S K W T P S R H
+
+W T K S R H S P
+T K W S H S R P
+W K T S P H S R
+T W K S H R S P
+
+S H T P S R K W
+S P H T S W R K
+S T H P S K R W
+S H P T S R W K
+
+P T H S W K R S
+T H P S K R W S
+P H T S W R K S
+T P H S K W R S
+
+S T W H S K P R
+S H T W S R K P
+S W H T S P K R
+S T H W S K R P
+
+H W T S R P K S
+W T H S P K R S
+T H W S R K P S
+W H T S P R K S
+
+S K T W P S H R
+S W K T P R S H
+S T K W P H S R
+S K W T P S R H
+
+W T K S R H S P
+T K W S H S R P
+W K T S P H S R
+T W K S H R S P
+    </textarea>
+    <textarea id="drillz-lower-keys" name="[Drillz] Tedley Lower Keys">#raw
+
+S K W R S K R W 		S W K R S W R K
+S R K W S R W K 		S K W R S K R W
+S W K R S W R K		S R K W S R W K
+
+-R -B -G -S -R -B -S -G		-R -G -B -S -R -G -S -B
+-R -S -B -G -R -S -G -B		-R -B -G -S -R -B -S -G
+-R -G -B -S -R -G -S -B		-R -S -B -G -R -S -G -B
+
+
+
+R S K W R S W K 		R K S W R K W S
+R W S K R W K S 		R S K W R S W K
+R K S W R K W S		R W S K R W K S
+
+-S -R -B -G -S -R -G -B		-S -B -R -G -S -B -G -R
+-S -G -R -B -S -G -B -R		-S -R -B -G -S -R -G -B
+-S -B -R -G -S -B -G -R		-S -G -R -B -S -G -B -R
+
+
+W R S K W R K S 		W S R K W S K R
+W K R S W K S R 		W R S K W R K S
+W S R K W S K R		W K R S W K S R
+
+-G -S -R -B -G -S -B -R		-G -R -S -B -G -R -B -S
+-G -B -S -R -G -B -R -S		-G -S -R -B -G -S -B -R
+-G -R -S -B -G -R -B -S		-G -B -S -R -G -B -R -S
+
+
+K W R S K W S R 		K R W S K R S W
+K S W R K S R W 		K W R S K W S R
+K R W S K R S W		K S W R K S R W
+
+-B -G -S -R -B -G -R -S		-B -S -G -R -B -S -R -G
+-B -R -G -S -B -R -S -G		-B -G -S -R -B -G -R -S
+-B -S -G -R -B -S -R -G		-B -R -G -S -B -R -S -G
+
+
+S K W R S K R W 		S W K R S W R K
+S R K W S R W K 		S K W R S K R W
+S W K R S W R K		S R K W S R W K
+
+-R -B -G -S -R -B -S -G		-R -G -B -S -R -G -S -B
+-R -S -B -G -R -S -G -B		-R -B -G -S -R -B -S -G
+-R -G -B -S -R -G -S -B		-R -S -B -G -R -S -G -B
+
+
+R S K W R S W K 		R K S W R K W S
+R W S K R W K S 		R S K W R S W K
+R K S W R K W S		R W S K R W K S
+
+-S -R -B -G -S -R -G -B		-S -B -R -G -S -B -G -R
+-S -G -R -B -S -G -B -R		-S -R -B -G -S -R -G -B
+-S -B -R -G -S -B -G -R		-S -G -R -B -S -G -B -R
+
+
+W R S K W R K S 		W S R K W S K R
+W K R S W K S R 		W R S K W R K S
+W S R K W S K R		W K R S W K S R
+
+-G -S -R -B -G -S -B -R		-G -R -S -B -G -R -B -S
+-G -B -S -R -G -B -R -S		-G -S -R -B -G -S -B -R
+-G -R -S -B -G -R -B -S		-G -B -S -R -G -B -R -S
+
+
+K W R S K W S R 		K R W S K R S W
+K S W R K S R W 		K W R S K W S R
+K R W S K R S W		K S W R K S R W
+
+-B -G -S -R -B -G -R -S		-B -S -G -R -B -S -R -G
+-B -R -G -S -B -R -S -G		-B -G -S -R -B -G -R -S
+-B -S -G -R -B -S -R -G		-B -R -G -S -B -R -S -G
+</textarea>
+<textarea id="drillz-upper-keys" name="[Drillz] Tedley Upper Keys">#raw
+S T P H S T H P 
+S P T H S P H T 
+S H T P S H P T 
+S T P H S T H P 
+S P T H S P H T 
+S H T P S H P T 
+
+-F -P -L -T -F -P -T –L 
+-F -L -P -T -F -L -T –P 
+-F -T -P -L -F -T -L –P 
+-F -P -L -T -F -P -T –L 
+-F -L -P -T -F -L -T –P 
+-F -T -P -L -F -T -L –P 
+
+
+H S T P H S P T 
+H T S P H T P S 
+H P S T H P T S 
+H S T P H S P T 
+H T S P H T P S 
+H P S T H P T S 
+
+-T -F -P -L -T -F -L –P 
+-T -P -F -L -T -P -L –F 
+-T -L -F -P -T -L -P –F 
+-T -F -P -L -T -F -L –P 
+-T -P -F -L -T -P -L –F 
+-T -L -F -P -T -L -P –F 
+
+
+P H S T P H T S 
+P S H T P S T H 
+P T H S P T S H 
+P H S T P H T S 
+P S H T P S T H 
+P T H S P T S H 
+
+-L -T -F -P -L -T -P –F  
+-L -F -T -P -L -F -P –T 
+-L -P -T -F -L -P -F –T 
+-L -T -F -P -L -T -P –F 
+-L -F -T -P -L -F -P –T 
+-L -P -T -F -L -P -F –T 
+
+
+T P H S T P S H 
+T H P S T H S P 
+T S P H T S H P 
+T P H S T P S H 
+T H P S T H S P 
+T S P H T S H P 
+
+-P -L -T -F -P -L -F –T 
+-P -T -L -F -P -T -F –L 
+-P -F -L -T -P -F -T –L 
+-P -L -T -F -P -L -F –T 
+-P -T -L -F -P -T -F –L 
+-P -F -L -T -P -F -T –L 
+
+S T P H S T H P 
+S P T H S P H T 
+S H T P S H P T 
+S T P H S T H P 
+S P T H S P H T 
+S H T P S H P T 
+
+-F -P -L -T -F -P -T –L 
+-F -L -P -T -F -L -T –P 
+-F -T -P -L -F -T -L –P 
+-F -P -L -T -F -P -T –L 
+-F -L -P -T -F -L -T –P 
+-F -T -P -L -F -T -L –P 
+
+
+H S T P H S P T 
+H T S P H T P S 
+H P S T H P T S 
+H S T P H S P T 
+H T S P H T P S 
+H P S T H P T S 
+
+-T -F -P -L -T -F -L –P 
+-T -P -F -L -T -P -L –F 
+-T -L -F -P -T -L -P –F 
+-T -F -P -L -T -F -L –P 
+-T -P -F -L -T -P -L –F 
+-T -L -F -P -T -L -P –F 
+
+
+P H S T P H T S 
+P S H T P S T H 
+P T H S P T S H 
+P H S T P H T S 
+P S H T P S T H 
+P T H S P T S H 
+
+-L -T -F -P -L -T -P –F 
+-L -F -T -P -L -F -P –T 
+-L -P -T -F -L -P -F –T 
+-L -T -F -P -L -T -P –F 
+-L -F -T -P -L -F -P –T 
+-L -P -T -F -L -P -F –T 
+
+
+T P H S T P S H 
+T H P S T H S P 
+T S P H T S H P 
+T P H S T P S H 
+T H P S T H S P 
+T S P H T S H P 
+
+-P -L -T -F -P -L -F –T 
+-P -T -L -F -P -T -F –L 
+-P -F -L -T -P -F -T –L 
+-P -L -T -F -P -L -F –T 
+-P -T -L -F -P -T -F –L 
+-P -F -L -T -P -F -T –L 
+</textarea>
+    <textarea id="shastay-vowels" name="[Court Reporting Help] Vowels R Us">
+bat bait bet beet bit bite boat but butte bought boot bout
+man main men mean mine moan moon
+ban bane Ben bean bin bone bon bun boon
+can cane Ken keen kin con cone coin
+hat hate heat hit hot hut haute hoot
+sat sate set seat sit sot suit sought
+Sal sail sell seal sill sole soil
+fat fate feet fit fight fought foot
+Dan Dane den dean din dine don dun dune down
+Hal hail hell heal hill hole hull howl Hoyle
+tack take tech teak tick tyke tock toke tuck talk
+lack lake leek lick like lock luck Luke lout loot
+sack sake seek sick sock soak suck
+had head heed hid hide
+ball bale bell bill bile boll bull bowel boil
+sad said seed Sid side sod
+pat pate pet peat pit pot put pout
+rad raid red reed rid ride rod rode rude
+lat late let lit light lot lute lout
+mat mate met meat mitt mite moat mutt mute moot
+dale dell deal dill dial doll dole dull duel dual
+bad bade bed bead bid bide bod bode bud baud
+pan pane pen peen pin pine pone pun
+sack sake seek sick sock soak suck soak
+tall tail tell teal till tile toll towel toil
+Big bad Ben bought bent bun bins.
+Lest Lou lost, Luke liked Len least.
+Pour pure power per puree purred Perry.
+    </textarea>
+    <textarea id="shastay-that" name="[Court Reporting Help] That Phrases">
+that are
+that can
+that cannot
+that could
+that have been
+that he believed
+that he believes
+that he can
+that he could
+that he feels
+that he felt
+that he knows
+that he means
+that he recalled
+that he recalls
+that he recollected
+that he recollects
+that he remembered
+that he remembers
+that he shall
+that he should
+that he understand
+that he understands
+that he wanted
+that he wants
+that he was
+that he would
+that he would say
+that I believe
+that I believed
+that I can
+that I could
+that I feel
+that I felt
+that I know
+that I recall
+that I recalled
+that I recollect
+that I recollected
+that I remember
+that I remembered
+that I shall
+that I should
+that I understand
+that I want
+that I wanted
+that I was
+that I would
+that I would say
+that is that is all
+that is correct
+that is right
+that shall
+that should
+that the
+that was
+that were
+that will
+that would
+that you are
+that you believe
+that you believed
+that you can
+that you could
+that you feel
+that you felt
+that you have
+that you know
+that you mean
+that you recall
+that you recalled
+that you recollect
+that you recollected
+that you remember
+that you remembered
+that you shall
+that you should
+that you understand
+that you want
+that you wanted
+that you were
+that you would
+that you would say
+    </textarea>
+    <textarea id="shastay-who" name="[Court Reporting Help] Who Phrases">
+who believe
+who believed
+who believes
+who can
+who cannot
+who could
+who feel
+who feels
+who felt
+who had
+who have
+who have been
+who have had
+who he wanted
+who he wants
+who is
+who I want
+who I wanted
+who recollect
+who recollected
+who recollects
+who remember
+who remembered
+who remembers
+who shall
+who should
+who think
+who thinks
+who understand
+who understands
+who want
+who wanted
+who wants
+who was
+who were
+who would
+who you want
+who you wanted
+    </textarea>
 </div></div>
 </body>
 </html>
+

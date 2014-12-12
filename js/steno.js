@@ -31,6 +31,8 @@ function stenoArray(steno) {
     return r;
 }
 
+var STENO_ORDER = ["S","T","K","P","W","H","R","A","O","*","E","U","-F","-R","-P","-B","-L","-G","-T","-S","-D","-Z"];
+
 // Given to steno strokes, picks the 'better' one. We base this
 // mostly on stroke size.
 // TODO: have an expert look at this!
