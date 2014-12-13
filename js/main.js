@@ -307,6 +307,19 @@ function mkExerciseWord(word, strokes, good_strokes, recognized) {
         user: [], // what you stroked in
         status: S_PENDING};
 }
+function inputExerciseWord(format, word) {
+    if (!/\S/.test(word)) return null;
+    if (format == "#standard") {
+        var strokes = wordStrokes(word);
+        var t_strokes = mapFilter(strokes, filterDifficulty);
+        var good_strokes = mapFilter(strokes, filterDifficultyOnlyGood);
+        return mkExerciseWord(word, t_strokes, good_strokes, !!strokes.length);
+    } else if (format == "#raw-right") {
+        return mkExerciseWord(word, ["-" + word], ["-" + word], true);
+    } else if (format == "#raw") {
+        return mkExerciseWord(word, [word], [word], true);
+    }
+}
 function getCurrentWord() {
     return data[cur_line].words[cur_word];
 }
@@ -315,10 +328,10 @@ function loadData() {
     var text = $("#data").val();
     var lines = text.split("\n");
     var c = 0;
+    var format = "#standard";
     updateStyle();
     updateDifficulty();
     if (cur_style == "script") {
-        var format = "#standard";
         lines.forEach(function(line) {
             if (line[0] == "#") {
                 format = line;
@@ -326,44 +339,37 @@ function loadData() {
             }
             var cur = [];
             var sub_c = 0;
-            var words = line.split(" ");
-            words.forEach(function(word) {
-                if (/\S/.test(word)) {
-                    if (format == "#standard") {
-                        var strokes = wordStrokes(word);
-                        var t_strokes = mapFilter(strokes, filterDifficulty);
-                        var good_strokes = mapFilter(strokes, filterDifficultyOnlyGood);
-                        if (good_strokes) {
-                            sub_c++;
-                        }
-                        cur.push(mkExerciseWord(word, t_strokes, good_strokes, !!strokes.length));
-                    } else if (format == "#raw-right") {
+            line.split(" ").forEach(function(word) {
+                var e = inputExerciseWord(format, word);
+                if (e) {
+                    if (e.goodStrokes.length) {
                         sub_c++;
-                        cur.push(mkExerciseWord(word, ["-" + word], ["-" + word], true));
-                    } else if (format == "#raw") {
-                        sub_c++;
-                        cur.push(mkExerciseWord(word, [word], [word], true));
                     }
+                    cur.push(e);
                 }
-                });
+            });
             if (cur.length > 0) data.push({index: c, words: cur});
             c += sub_c;
             });
     } else if (cur_style == "randomized") {
         var count = parseInt($("#randomLength").val());
         var corpus = [];
-        $.each( lines, function(i,line) {
-                var words = line.split(" ");
-                $.each( words, function(i, rword) {
-                    var word = depunctuateWord(rword);
-                    var strokes = wordStrokes(word);
-                    var t_strokes = mapFilter(strokes, filterDifficulty);
-                    var good_strokes = mapFilter(strokes, filterDifficultyOnlyGood);
-                    if (/\S/.test(word) && good_strokes.length) {
-                        corpus.push(mkExerciseWord(word, t_strokes, good_strokes, true));
-                    }
-                    });
-                });
+        lines.forEach(function(line) {
+            if (line[0] == "#") {
+                format = line;
+                return;
+            }
+            line.split(" ").forEach(function(rword) {
+                // depunctuate for random drills, so a
+                // transcript: 'He said "Boo!"'
+                // turns into ['He', 'said', 'Boo']
+                var word = depunctuateWord(rword);
+                var e = inputExerciseWord(format, word);
+                if (e && e.goodStrokes.length) {
+                    corpus.push(e);
+                }
+            });
+        });
         if (!corpus.length) {
             $("#viewport").html("<em>No data</em>");
             return;
