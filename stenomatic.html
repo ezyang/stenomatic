@@ -14,7 +14,14 @@
 <link rel="stylesheet" type="text/css" href="style.css">
 </head>
 <body>
-<div id="viewport"><em>Loading Dictionary...</em></div>
+<div>
+<input type="text" id="txtInput">
+<!--
+<input type="submit" value="&lt;" id="prevbtn">
+<input type="submit" value="&gt;" id="nextbtn">
+-->
+<input type="submit" value="Restart" id="loadbtn2">
+</div>
 <div id="controls" style="display:none">
     <div>
         <strong>Controls:</strong>
@@ -26,20 +33,11 @@
         Mistakes |
         Retry <input value="Words" type="submit" id="controls-retry-words">
         <input value="Lines" type="submit" id="controls-retry-lines">
-    <div>
-</div>
-</div>
-<div>
-<input type="text" id="txtInput">
-<!--
-<input type="submit" value="&lt;" id="prevbtn">
-<input type="submit" value="&gt;" id="nextbtn">
--->
-<input type="submit" value="Restart" id="loadbtn2">
 </div>
 <div id="barometer"></div>
 <div id="stats"></div>
 <div id="prompt"></div>
+<div id="viewport"><em>Loading Dictionary...</em></div>
 <input type="checkbox" id="chkPlainTextInput">
 <hr>
 <p>

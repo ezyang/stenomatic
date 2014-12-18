@@ -358,7 +358,7 @@ function loadData() {
                     cur.push(e);
                 }
             });
-            if (cur.length > 0) data.push({index: c, orig: line, words: cur});
+            data.push({index: c, orig: line, words: cur});
             c += sub_c;
             });
     } else if (cur_style == "randomized") {
@@ -475,6 +475,7 @@ function paintExercise() {
             div.append(elem);
             div.append(document.createTextNode(" "));
         });
+        div.append("&nbsp;");
     });
 }
 function prevWord() {
