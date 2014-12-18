@@ -139,6 +139,9 @@ var tries = 0;
 // Recorded samples. We won't commit them to the database
 // until the exercise finishes.
 var samples = [];
+// Target stroke time, in ms
+var target_latency = parseInt(docCookies.getItem("target_latency"));
+var metadata = "";
 
 // IndexedDb to store sample data
 var db;
@@ -201,18 +204,23 @@ function addSample(actual, expected) {
     samples.push(record);
 }
 
+// PRESERVE UNDO by doing it directly
+function setData(val) {
+    $("#data").get(0).value = val;
+}
+
 function init() {
     $("textarea", "#samples").each(function() {
             $("#select-sample").append($("<option>").prop("value", $(this).prop("id")).text($(this).prop("name")));
             });
     $("#select-sample").change(function(e) {
             var t = $(document.getElementById($("#select-sample").val()));
-            $("#data").val(t.val());
+            setData(t.val());
             });
     $("#txtInput").val(""); // force empty
     $("#loadbtn").click(loadData);
     $("#loadbtn2").click(loadData);
-    $("#clearbtn").click(function() {$("#data").val("")});
+    $("#clearbtn").click(function() {setData("")});
     $("#txtInput").keyup(keyUp).keydown(keyDown);
     $("#prevbtn").click(function() {
             if (cur_line == 0) {
@@ -220,7 +228,7 @@ function init() {
                 $.each(data[cur_line].words, function(j,word_entry) {
                         word_entry.status = S_PENDING;
                     });
-                paintLine();
+                //paintLine();
                 nextWord();
                 return;
             }
@@ -232,7 +240,7 @@ function init() {
                         word_entry.status = S_PENDING;
                     });
                 cur_word = -1;
-                paintLine();
+                //paintLine();
                 nextWord();
                 i++;
             }
@@ -241,7 +249,7 @@ function init() {
         if (cur_line == data.length - 1) return;
         cur_line++;
         cur_word = -1;
-        paintLine();
+        //paintLine();
         nextWord();
         });
     $("#dumpbtn").click(function () {
@@ -325,6 +333,7 @@ function getCurrentWord() {
 }
 function loadData() {
     data = [];
+    metadata = "";
     var text = $("#data").val();
     var lines = text.split("\n");
     var c = 0;
@@ -335,6 +344,7 @@ function loadData() {
         lines.forEach(function(line) {
             if (line[0] == "#") {
                 format = line;
+                metadata += line + "\n";
                 return;
             }
             var cur = [];
@@ -348,7 +358,7 @@ function loadData() {
                     cur.push(e);
                 }
             });
-            if (cur.length > 0) data.push({index: c, words: cur});
+            if (cur.length > 0) data.push({index: c, orig: line, words: cur});
             c += sub_c;
             });
     } else if (cur_style == "randomized") {
@@ -357,6 +367,7 @@ function loadData() {
         lines.forEach(function(line) {
             if (line[0] == "#") {
                 format = line;
+                metadata += line + "\n";
                 return;
             }
             line.split(" ").forEach(function(rword) {
@@ -426,12 +437,15 @@ function startData() {
     $("#txtInput").prop("disabled", false);
     $("#prevbtn").prop("disabled", false);
     $("#nextbtn").prop("disabled", false);
+    $("#controls").css("display", "none");
     finished = false;
     $('#stats').html("");
     $('#barometer').html("");
-    paintLine();
+    paintExercise();
+    //paintLine();
     nextWord();
 }
+/*
 function paintLine() {
     var v = $("#viewport");
     v.html('');
@@ -443,6 +457,24 @@ function paintLine() {
             paintWord(word_entry);
             v.append(elem);
             v.append(document.createTextNode(" "));
+    });
+}
+*/
+function paintExercise() {
+    var v = $("#viewport");
+    v.html('');
+    data.forEach(function(l) {
+        var div = $("<div>");
+        v.append(div);
+        l.words.forEach(function(word_entry) {
+            var word = word_entry.word;
+            var elem = word_entry.elem ? word_entry.elem : $("<span>");
+            word_entry.elem = elem;
+            elem.text(word);
+            paintWord(word_entry);
+            div.append(elem);
+            div.append(document.createTextNode(" "));
+        });
     });
 }
 function prevWord() {
@@ -464,7 +496,7 @@ function prevWord() {
         var first = false;
     }
     if (repaint_line) {
-        paintLine();
+        //paintLine();
     }
     setupWord();
 }
@@ -487,13 +519,18 @@ function nextWord(misstroke) {
     } else if (cur_line < data.length - 1) {
         cur_word = -1;
         cur_line++;
-        paintLine();
+        //paintLine();
         return nextWord();
     } else {
         // done
         finishExercise();
         return;
     }
+    var el = getCurrentWord().elem;
+    var container = $("#viewport");
+    container.animate({
+        scrollTop: el.offset().top - container.offset().top + container.scrollTop()
+            });
     setupWord();
 }
 
@@ -535,47 +572,90 @@ function finishExercise() {
     $("#txtInput").prop("disabled", true);
     $("#prevbtn").prop("disabled", true);
     $("#nextbtn").prop("disabled", true);
+    $("#controls").css("display", "inherit");
     finished = true;
     // commit to database
     db.transaction(["runs"], "readwrite")
       .objectStore("runs")
       .put({time: exercise_start.getTime(), samples: samples});
     // run some quick stats
-    var errors = 0;
-    var error_list = [];
     var v = $("#viewport");
+    var population = [];
     v.html("");
-    $.each(data, function(i,line) {
-            var d = $("<div class='many'>");
-            $.each(line.words, function(j,word) {
-                var cell = $("<table class='unit'>");
-                cell.prop("title", word.user.join(", "))
-                cell.append($("<tr>").html($("<td class='over'>").html(word.elem)));
-                var annot = "";
-                if (!word.recognized) {
-                } else if (cur_mode == "speed") {
-                    annot = diffSteno(word.user[word.user.length-1], word.bestStroke);
-                } else if (cur_mode == "accuracy") {
-                    // TODO: color code for victory
-                    // two significant digits at all times
-                    var time = word.time >= 1000 ? (Math.round(word.time / 100) / 10)
-                                                 : (Math.round(word.time / 10) / 100);
-                    annot += time;
-                    if (word.user.length > 1) {
-                        annot += "<sup class='errorCount'>(" + (word.user.length - 1) + ")</sup>"
-                    }
-                    annot = $("<span class='wordstat'>").html(annot);
-                }
-                cell.append($("<tr>").html($("<td class='under'>").html(annot)));
-                d.append(cell);
-                d.append(document.createTextNode(" "));
-                if (word.status == S_INCORRECT) {
-                    errors++;
-                }
-                });
-            v.append(d);
+    data.forEach(function(line) {
+        var d = $("<div class='many'>");
+        line.words.forEach(function(word) {
+            var span = $("<span class='unit'>");
+            span.html(word.elem);
+            word.elem.removeClass("done");
+            d3.selectAll(span.get()).data([word]);
+            d.append(span);
+            d.append(document.createTextNode(" "));
+            // infinity for error?! time loss good enough
+            population.push(word.time);
             });
-    $("#stats").html("<strong>Uncorrected errors:</strong> " + errors);
+        v.append(d);
+        });
+    // TODO setting the on handlers here is silly....
+    population.sort(function(a,b){return a - b});
+    var bgcolor = d3.scale.threshold().range(["#FFF", "#A00"]);
+    var fgcolor = d3.scale.threshold().range(["#000", "#FFF"]);
+    var units = d3.selectAll(v.get()).selectAll(".unit");
+    var slider = $("#controls-slider");
+    var slider_ms = $("#controls-ms");
+    var slider_wpm = $("#controls-wpm");
+    var mistakes = $("#controls-mistakes").unbind('change').on("change", updateUnits);
+    slider.attr("max", population.length-1);
+    slider.attr("value", d3.bisectLeft(population, target_latency));
+    function mistakeP(d) {
+        return d.user.length > 1 && mistakes.prop("checked");
+    }
+    function updateUnits() {
+        target_latency = population[parseInt(slider.val())];
+        docCookies.setItem("target_latency", target_latency, Infinity);
+        target_wpm = Math.floor((60 * 1000) / target_latency);
+        slider_ms.val(target_latency);
+        slider_wpm.val(target_wpm);
+        bgcolor.domain([target_latency]);
+        fgcolor.domain([target_latency]);
+        units
+            .style("background-color", function(d) { return mistakeP(d) ? "#000" : bgcolor(d.time); })
+            .style("color", function(d) { return mistakeP(d) ? "#FFF" : fgcolor(d.time); })
+    }
+    updateUnits();
+    slider.unbind("input").on("input", updateUnits);
+    $("#controls-retry-words").unbind('click').click(function () {
+        var split_at = 10;
+        var new_line = [];
+        var new_lines = [new_line];
+        units.each(function(d) {
+            if (mistakeP(d) || d.time >= target_latency) {
+                new_line.push(depunctuateWord(d.word));
+                if (new_line.length >= 10) {
+                    new_line = [];
+                    new_lines.push(new_line);
+                }
+            }
+        });
+        setData(metadata + "\n" + new_lines.map(function(l) {return l.join(" ")}).join("\n"));
+        loadData();
+    });
+    $("#controls-retry-lines").unbind('click').click(function () {
+        var new_lines = [];
+        data.forEach(function(l) {
+            if (l.words.some(function(d) {
+                return mistakeP(d) || d.time >= target_latency;
+            })) {
+                if (l.orig) {
+                    new_lines.push(l.orig);
+                } else {
+                    new_lines.push(l.words.map(function (d) {return d.word;}).join(" "));
+                }
+            }
+        });
+        setData(metadata + "\n" + new_lines.join("\n"));
+        loadData();
+    });
 }
 
 function setupWord() {

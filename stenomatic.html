@@ -4,6 +4,8 @@
 <title>Stenomatic 9000</title>
 <link rel="prefetch" href="categorized.json">
 <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/d3/3.5.2/d3.min.js"></script>
+<!--<script src="http://d3js.org/colorbrewer.v1.min.js"></script>-->
 <script src="js/util.js"></script>
 <script src="js/cookies.js"></script>
 <script src="js/steno.js"></script>
@@ -13,6 +15,20 @@
 </head>
 <body>
 <div id="viewport"><em>Loading Dictionary...</em></div>
+<div id="controls" style="display:none">
+    <div>
+        <strong>Controls:</strong>
+        <input type="range" min="0" step="1" id="controls-slider" />
+        <input type="text" id="controls-ms" size="3" />ms /
+        <input type="text" id="controls-wpm" size="2" /> WPM
+    </div>
+        <input type="checkbox" id="controls-mistakes">
+        Mistakes |
+        Retry <input value="Words" type="submit" id="controls-retry-words">
+        <input value="Lines" type="submit" id="controls-retry-lines">
+    <div>
+</div>
+</div>
 <div>
 <input type="text" id="txtInput">
 <!--
@@ -23,7 +39,7 @@
 </div>
 <div id="barometer"></div>
 <div id="stats"></div>
-<span id="prompt"></span>
+<div id="prompt"></div>
 <input type="checkbox" id="chkPlainTextInput">
 <hr>
 <p>
