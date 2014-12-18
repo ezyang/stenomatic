@@ -466,6 +466,7 @@ function paintExercise() {
     data.forEach(function(l) {
         var div = $("<div>");
         v.append(div);
+        var flag = false;
         l.words.forEach(function(word_entry) {
             var word = word_entry.word;
             var elem = word_entry.elem ? word_entry.elem : $("<span>");
@@ -474,8 +475,9 @@ function paintExercise() {
             paintWord(word_entry);
             div.append(elem);
             div.append(document.createTextNode(" "));
+            flag = true;
         });
-        div.append("&nbsp;");
+        if (!flag) div.append("&nbsp;");
     });
 }
 function prevWord() {
