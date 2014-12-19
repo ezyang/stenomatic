@@ -595,7 +595,7 @@ function finishExercise() {
             d.append(span);
             d.append(document.createTextNode(" "));
             // infinity for error?! time loss good enough
-            population.push(word.time);
+            if (word.time) population.push(word.time);
             });
         v.append(d);
         });
