@@ -531,7 +531,7 @@ function nextWord(misstroke) {
     }
     var el = getCurrentWord().elem;
     var container = $("#viewport");
-    container.animate({
+    container.stop().animate({
         scrollTop: el.offset().top - container.offset().top + container.scrollTop()
             });
     setupWord();
