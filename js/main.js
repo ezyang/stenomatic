@@ -732,7 +732,11 @@ function showAnswerPrompt(steno) {
     if (cur_mode == "speed") {
         nextWord(true);
     }
-    $("#prompt").text(best_cand + ", you did " + steno);
+    if ($('#show-hints').prop("checked")) {
+        $("#prompt").text(best_cand + ", you did " + steno);
+    } else {
+        $("#prompt").text("You did " + steno);
+    }
 }
 function setStenoKeyboardPressedKeys() {}
 function clearStenoKeyboardPressed() {}
