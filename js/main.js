@@ -160,6 +160,7 @@ request.onsuccess = function(e) {
 
 function updateMode() {
     cur_mode = $('input[name=mode]:checked', '#modebtns').val();
+    console.log(cur_mode);
 }
 
 function updateDifficulty() {

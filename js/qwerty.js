@@ -22,7 +22,7 @@ var answerGivenSoFar = "";
 var currentStroke = 1;
 
 function correctAnswer(answer) {
-    if (jQuery('#chkPlainTextInput').is(':checked')) {
+    if (cur_mode == 'verbatim') {
 
         // Plain text mode
         var text = currentDrillItem.Text;
@@ -446,7 +446,7 @@ function getStenoLetter(keyCode) {
 
 function keyDown(event) {
 
-    if (jQuery('#chkPlainTextInput').is(':checked')) {
+    if (cur_mode == 'verbatim') {
         
         // Plain text mode
     }
@@ -460,7 +460,7 @@ function keyDown(event) {
 
 function keyUp(event) {
 
-    if (jQuery('#chkPlainTextInput').is(':checked')) {
+    if (cur_mode == 'verbatim') {
 
         // Plain text mode
         var text = jQuery('#txtInput').val();

@@ -43,8 +43,15 @@
 <p>
 <em>Greetings mortal, I am the Stenomatic 9000</em>. To utilize my services, copy paste some exercise material (for example, the exercises in <a href="https://sites.google.com/site/ploverdoc/lesson-1-fingers-and-keys">Learn Plover</a>) and select what kind of exercise you want to do.  Then press load and go! (If you change any settings, you will need to reload the exercise.)  I am a derivative work of <a href="http://qwertysteno.com/Home/">Qwerty Steno</a>, with whom I share the QWERTY input handling code.  <a href="https://github.com/ezyang/stenomatic">Fork me on GitHub.</a>
 </p>
+<p>
+<strong class="boxLabel">Show hints?</strong> <input type="checkbox" name="show-hints">
+</p>
 <h2>Mode:</h2>
 <table id="modebtns">
+    <tr>
+        <td></td>
+        <td><strong class="boxLabel">QWERTY</strong> Stenomatic will translate your strokes into steno using its internal dictionary.
+<table>
     <tr>
         <td><input type="radio" name="mode" value="accuracy" onclick="updateMode()" checked></td>
         <td><strong class="boxLabel">Require correct stroke</strong> If you misstroke, the stroke is rejected; you cannot move on until you get the stroke right.  When you are done, you will see how long it took for you to stroke a word, as well as how many misstrokes were made before the word was finished.</td>
@@ -54,7 +61,18 @@
         <td><strong class="boxLabel">Advance on misstroke</strong> If you misstroke a word, you'll move onto the next one.  You can go back and fix your error with the asterisk.  When you are done, you will be shown all of your misstrokes and a suggested correction for them.  Try using this mode with a metronome!</td>
     </tr>
 </table>
-<strong class="boxLabel">Show hints?</strong> <input type="checkbox" name="show-hints">
+</td>
+    </tr>
+    <tr>
+        <td></td>
+        <td><strong class="boxLabel">External</strong> Use an external program like Plover to type in text.  Exercises involving raw input are not supported using this mode.
+            <table>
+                <tr><td><input type="radio" name="mode" value="verbatim" onclick="updateMode()"></td>
+                    <td><strong>Type as shown</strong> Input must be typed exactly as seen, modulo linebreaks.</td></tr>
+            </table>
+        </td>
+    </tr>
+</table>
 <h2>Style:</h2>
 <table id="stylebtns">
     <tr>
@@ -67,7 +85,7 @@
     </tr>
 </table>
 <h2>Difficulty:</h2>
-You can reduce the difficulty of an exercise by stroking a subset of the keys of the true strokes: this is good for working on muscle memory.  <input type="submit" value="Enable all" onclick="$('#difficultybtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#difficultybtns input').prop('checked', false);" />
+You can reduce the difficulty of an exercise by stroking a subset of the keys of the true strokes: this is good for working on muscle memory.  This is only available when working with the QWERTY input mode.  <input type="submit" value="Enable all" onclick="$('#difficultybtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#difficultybtns input').prop('checked', false);" />
 <table id="difficultybtns">
     <tr>
         <td><input type="checkbox" id="enable-left" value="left" checked></td>
@@ -91,7 +109,7 @@ You can reduce the difficulty of an exercise by stroking a subset of the keys of
     </tr>
 </table>
 <h2>Filter:</h2>
-You can skip difficult words by filtering them out.  <input type="submit" value="Enable all" onclick="$('#filterbtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#filterbtns input').prop('checked', false);" />
+You can skip difficult words by filtering them out.  At the moment, this is only available when using QWERTY input modes.  <input type="submit" value="Enable all" onclick="$('#filterbtns input').prop('checked', true);" /> <input type="submit" value="Clear all" onclick="$('#filterbtns input').prop('checked', false);" />
 <table id="filterbtns">
     <tr>
         <td><input type="checkbox" id="enable-asterisk" value="asterisk" checked></td>
